@@ -250,13 +250,6 @@ ApplicationWindow {
         width: parent.width * 0.9
         //父容器的70%
 
-        Button {
-                text: "连接服务器 (127.0.0.1:8888)"
-                width: parent.width
-                height: 40
-                onClicked: tcpManager.connectToServer()
-                //调用tcpmanager的connectToServer()方法
-            }
         Row{
                 width:parent.width - 40
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -445,13 +438,6 @@ ApplicationWindow {
                       }
          }
 
-         Button {
-                   text: "断开连接按钮"
-                        width: parent.width
-                        height: 40
-                        onClicked: tcpManager.disconnectFromServer()
-         }
-
          Text {
                    id: errorText
                    text: ""
@@ -565,8 +551,62 @@ ApplicationWindow {
                    modePopup.open();
              }
              }
-
              }
+                  Column{
+                  id:layoutColumn
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.left: parent.left
+                  anchors.margins: 20
+                  width: 280
+                   height: 150
+                  spacing:10
+                  z:10
+                  Text{
+                  text: "服务器设置"
+                  font.pixelSize: 16
+                  color:"black"
+                  }
+                  Row{
+                   width: parent.width
+                   height: 30
+                   spacing: 10
+                  TextField{
+                  id:ipInput
+                  width: parent.width * 0.65
+                   height: parent.height
+                   placeholderText: "IP 地址"
+                   font.pixelSize: 14
+                  }
+                  TextField {
+                                  id: portInput
+                                  width: parent.width * 0.30
+                                  height: parent.height
+                                  placeholderText: "端口"
+                                  font.pixelSize: 14
+                                  // 限制只能输入数字
+                                  validator: IntValidator { bottom: 1; top: 65535 }
+                              }
+                  }
+                  Button {
+                                  width: (parent.width - 10) / 2
+                                  height: 30
+                                  text: "连接"
+                                  onClicked: {
+                                      var ip = ipInput.text.trim();
+                                      var port = parseInt(portInput.text);
+                                      if (ip === "" || isNaN(port)) return;
+                                      tcpManager.connectToServer(ip, port);
+                                  }
+                              }
+                  Button {
+                                  width: (parent.width - 10) / 2
+                                  height: 30
+                                  text: "断开"
+                                  onClicked: {
+                                      tcpManager.disconnectFromServer();
+                                  }
+                              }
+                  }
         }
     Rectangle{
                    id: imagePage
@@ -693,13 +733,13 @@ ApplicationWindow {
     }
     }
 }
-    Popup {
+    Popup{
             id: modePopup
 
             // 关键配置
             modal: false
             focus: true
-            closePolicy: Popup.CloseOnPressOutside
+            // closePolicy: Popup.CloseOnPressOutside
             background: Item {}
     // 菜单内容
 
@@ -771,4 +811,4 @@ ApplicationWindow {
                        errorTimer.stop();
                        return true;
                        }
-    }
+}

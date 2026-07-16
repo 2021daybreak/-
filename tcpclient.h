@@ -10,7 +10,7 @@ class TcpClient : public QObject
     Q_OBJECT
 public:
     explicit TcpClient(QObject *parent = nullptr);
-    Q_INVOKABLE void connectToServer();
+    Q_INVOKABLE void connectToServer(const QString &ip,int port);
     Q_INVOKABLE void sendMessage(const QString &msg);
     Q_INVOKABLE void disconnectFromServer();
 signals:

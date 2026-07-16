@@ -63,15 +63,14 @@ TcpClient::TcpClient(QObject *parent)
     }
 
     // 3. 实现“连接服务器”的功能
-    void TcpClient::connectToServer()
+    void TcpClient::connectToServer(const QString &ip, int port)
     {
         if(socket->state() == QAbstractSocket::ConnectedState) {
-            emit connectionStatusChanged("Connected");
+            emit connectionStatusChanged("已连接到"+ip);
             return;
         }
-        // 这里的 IP 和端口要和你的服务端一致
-        socket->connectToHost("127.0.0.1", 8888);
-        emit connectionStatusChanged("TEST_SIGNAL");
+        socket->connectToHost(ip,port);
+        emit connectionStatusChanged("正在连接");
     }
 
     // 4. 实现“发送消息”的功能
