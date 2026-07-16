@@ -1,0 +1,68 @@
+{
+    "classes": [
+        {
+            "className": "TcpClient",
+            "lineNumber": 6,
+            "methods": [
+                {
+                    "access": "public",
+                    "index": 2,
+                    "lineNumber": 11,
+                    "name": "connectToServer",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "msg",
+                            "type": "QString"
+                        }
+                    ],
+                    "index": 3,
+                    "lineNumber": 12,
+                    "name": "sendMessage",
+                    "returnType": "void"
+                }
+            ],
+            "object": true,
+            "qualifiedClassName": "TcpClient",
+            "signals": [
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "msg",
+                            "type": "QString"
+                        }
+                    ],
+                    "index": 0,
+                    "lineNumber": 14,
+                    "name": "messageReceived",
+                    "returnType": "void"
+                },
+                {
+                    "access": "public",
+                    "arguments": [
+                        {
+                            "name": "status",
+                            "type": "QString"
+                        }
+                    ],
+                    "index": 1,
+                    "lineNumber": 15,
+                    "name": "connectionStatusChanged",
+                    "returnType": "void"
+                }
+            ],
+            "superClasses": [
+                {
+                    "access": "public",
+                    "name": "QObject"
+                }
+            ]
+        }
+    ],
+    "inputFile": "tcpclient.h",
+    "outputRevision": 69
+}

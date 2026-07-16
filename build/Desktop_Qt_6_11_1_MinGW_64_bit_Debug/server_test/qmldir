@@ -1,0 +1,6 @@
+module server_test
+typeinfo appserver_test.qmltypes
+prefer :/qt/qml/server_test/
+Main 254.0 Main.qml
+depends QtQuick
+

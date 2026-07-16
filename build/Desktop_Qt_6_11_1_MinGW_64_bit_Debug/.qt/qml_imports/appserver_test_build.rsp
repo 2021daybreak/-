@@ -1,0 +1,14 @@
+-rootPath
+C:/Users/sz/Documents/server_test
+-cmake-output
+-output-file
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/qml_imports/appserver_test_build.cmake
+-importPath
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug
+-importPath
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/server_test
+-importPath
+C:/Qt/6.11.1/mingw_64/qml
+-qrcFiles
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/qmake_server_test.qrc
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/appserver_test_raw_qml_0.qrc

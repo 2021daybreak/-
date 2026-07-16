@@ -1,0 +1,16 @@
+--bare
+-I
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug
+-I
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/server_test
+-I
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug
+-I
+C:/Qt/6.11.1/mingw_64/qml
+--resource
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/qmake_server_test.qrc
+--resource
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/appserver_test_raw_qml_0.qrc
+C:/Users/sz/Documents/server_test/Main.qml
+--json
+C:/Users/sz/Documents/server_test/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/appserver_test_qmllint.json

@@ -1,0 +1,43 @@
+file(REMOVE_RECURSE
+  ".qt/rcc/qrc_appserver_test_raw_qml_0.cpp"
+  ".qt/rcc/qrc_qmake_server_test.cpp"
+  ".rcc/qmlcache/appserver_test_Main_qml.cpp"
+  ".rcc/qmlcache/appserver_test_Main_qml.cpp.aotstats"
+  ".rcc/qmlcache/appserver_test_qmlcache_loader.cpp"
+  "CMakeFiles/appserver_test_autogen.dir/AutogenUsed.txt"
+  "CMakeFiles/appserver_test_autogen.dir/ParseCache.txt"
+  "appserver_test_autogen"
+  "CMakeFiles/appserver_test.dir/appserver_test_autogen/mocs_compilation.cpp.obj"
+  "CMakeFiles/appserver_test.dir/appserver_test_autogen/mocs_compilation.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/appserver_test_qmltyperegistrations.cpp.obj"
+  "CMakeFiles/appserver_test.dir/appserver_test_qmltyperegistrations.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/qrc_appserver_test_raw_qml_0.cpp.obj"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/qrc_appserver_test_raw_qml_0.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/qrc_qmake_server_test.cpp.obj"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.qt/rcc/qrc_qmake_server_test.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.rcc/qmlcache/appserver_test_Main_qml.cpp.obj"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.rcc/qmlcache/appserver_test_Main_qml.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.rcc/qmlcache/appserver_test_qmlcache_loader.cpp.obj"
+  "CMakeFiles/appserver_test.dir/build/Desktop_Qt_6_11_1_MinGW_64_bit_Debug/.rcc/qmlcache/appserver_test_qmlcache_loader.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/main.cpp.obj"
+  "CMakeFiles/appserver_test.dir/main.cpp.obj.d"
+  "CMakeFiles/appserver_test.dir/tcpclient.cpp.obj"
+  "CMakeFiles/appserver_test.dir/tcpclient.cpp.obj.d"
+  "appserver_test.exe"
+  "appserver_test.exe.manifest"
+  "appserver_test.pdb"
+  "appserver_test_autogen/mocs_compilation.cpp"
+  "appserver_test_autogen/timestamp"
+  "appserver_test_qmltyperegistrations.cpp"
+  "libappserver_test.dll.a"
+  "meta_types/appserver_test_json_file_list.txt"
+  "meta_types/appserver_test_json_file_list.txt.timestamp"
+  "meta_types/qt6appserver_test_metatypes.json"
+  "meta_types/qt6appserver_test_metatypes.json.gen"
+  "server_test/appserver_test.qmltypes"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/appserver_test.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()
