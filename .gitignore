@@ -67,3 +67,14 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+*.pro.user*
+*.qbs.user*
+CMakeLists.txt.user
+
+moc_*.cpp
+qrc_*.cpp
+qmltc_*.cpp
+
+.qmlls.ini
+
