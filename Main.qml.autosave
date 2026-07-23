@@ -132,9 +132,13 @@ ApplicationWindow {
         }
     }
     RowLayout{
+                       //导航栏下的整个界面
                    anchors.top: topNavBar.bottom
+                   //页面顶部在导航栏之下
                    anchors.bottom: parent.bottom
+                   //页面底部和整体父容器底部一样
                    width: parent.width
+                   //页面宽度和整体父容器一样
                    spacing: 0
     Rectangle//左侧导航栏
     {
@@ -150,8 +154,9 @@ ApplicationWindow {
                            Layout.preferredHeight: 60
                            text: "指令"
                            onClicked:currentPageIndex = 0
+                           //点击跳转第1页
                            background: Rectangle {
-                                      // 如果当前是第0页，显示蓝色背景，否则透明
+                                      // 如果当前是第1页，显示蓝色背景，否则透明
                                       color: (currentPageIndex === 0) ? "#3498db" : "transparent"
           }
                            Rectangle {
@@ -172,7 +177,7 @@ ApplicationWindow {
                    Layout.preferredHeight: 60
                    text: "控制"
 
-                           // 点击时跳转到第 1 页
+                           // 点击时跳转到第 2 页
                    onClicked: currentPageIndex = 1
                    background: Rectangle {
                    color: (currentPageIndex === 1) ? "#3498db" : "transparent"
@@ -193,7 +198,7 @@ ApplicationWindow {
                    Layout.preferredHeight: 60
                    text: "设置"
 
-                           // 点击时跳转到第 2 页
+                           // 点击时跳转到第 3 页
                    onClicked: currentPageIndex = 2
                    background: Rectangle {
                    color: (currentPageIndex === 2) ? "#3498db" : "transparent"
@@ -214,7 +219,7 @@ ApplicationWindow {
                    Layout.preferredHeight: 60
                    text: "导航"
 
-                           // 点击时跳转到第 3 页
+                           // 点击时跳转到第 4 页
                    onClicked: currentPageIndex = 3
                    background: Rectangle {
                    color: (currentPageIndex === 3) ? "#3498db" : "transparent"
@@ -230,9 +235,29 @@ ApplicationWindow {
                    verticalAlignment: Text.AlignVCenter
                                       }
                    }
+                   Button {
+                   Layout.fillWidth: true
+                   Layout.preferredHeight: 60
+                   text: ""
 
+                           // 点击时跳转到第 5 页
+                   onClicked: currentPageIndex = 4
+                   background: Rectangle {
+                   color: (currentPageIndex === 4)? "#3498db" : "transparent"
+                   Rectangle {
+                   width: 4; height: parent.height; color: "#2980b9"
+                   visible: (currentPageIndex === 4)
+                                      }
+                   }
+                   contentItem: Text {
+                   text: parent.text
+                   color: (currentPageIndex === 4) ? "white" : "black"
+                   horizontalAlignment: Text.AlignHCenter
+                   verticalAlignment: Text.AlignVCenter
+                                      }
+                   }
     }
-    }
+                   }
     StackLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -931,8 +956,12 @@ ApplicationWindow {
                    // 绑定旋转角度
                    rotation: imagePage.currentAngle
                    }
+    }               
     }
-    }
+                   Rectangle{
+                   color: "#E0E0E0"
+                   anchors.fill: parent
+                   }
     }
 }
     Popup{

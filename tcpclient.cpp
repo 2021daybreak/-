@@ -2,9 +2,20 @@
 #include <QTcpSocket>
 #include <QDebug>
 #include <QVariant>
+#include <QDir>
 TcpClient::TcpClient(QObject *parent)
     : QObject{parent}
 {
+    //检查资源
+    QDir dir(":/");
+    qDebug() << "Root resources:" << dir.entryList(); // 打印根目录下所有资源
+
+    // 或者直接检查特定文件
+    if (QFile::exists("qrc:/lab_7.6.png")) {
+        qDebug() << "Image found!";
+    } else {
+        qDebug() << "Image NOT found! Check prefix and filename.";
+    }
 
         // 1. 初始化 Socket,表示socket属于TcpSocket
         socket = new QTcpSocket(this);
