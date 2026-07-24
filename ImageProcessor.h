@@ -17,6 +17,6 @@ public:
     Q_INVOKABLE int mapHeight() const;
     Q_INVOKABLE bool isOccupied(int x, int y);
 private:
-    QImage m_image; // 用于在内存中保存图片数据
+    QImage m_imagesource;
 };
 #endif // IMAGEPROCESSOR_H

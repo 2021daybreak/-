@@ -17,28 +17,28 @@ bool ImageProcessor::loadMap(const QString &path) {
     file.close();
 
     // 从内存数据加载图片，这比直接传路径更可靠
-    if (!m_image.loadFromData(data)) {
+    if (!m_imagesource.loadFromData(data)) {
         qDebug() << "!!! 错误: 数据加载失败 (可能是图片损坏或格式不支持)";
         return false;
     }
 
     // 统一转为 ARGB32 格式
-    if (m_image.format() != QImage::Format_ARGB32) {
-        m_image = m_image.convertToFormat(QImage::Format_ARGB32);
+    if (m_imagesource.format() != QImage::Format_ARGB32) {
+        m_imagesource = m_imagesource.convertToFormat(QImage::Format_ARGB32);
     }
 
-    qDebug() << " 尺寸:" << m_image.width() << "x" << m_image.height();
+    qDebug() << " 尺寸:" << m_imagesource.width() << "x" << m_imagesource.height();
     return true;
 }
 
 int ImageProcessor::getGrayValue(int x, int y) {
-    if (x < 0 || y < 0 || x >= m_image.width() || y >= m_image.height())
+    if (x < 0 || y < 0 || x >= m_imagesource.width() || y >= m_imagesource.height())
     //边界检查
     {
         return -1;
     //返回值-1，错误码
     }
-    QRgb pixel = m_image.pixel(x, y);
+    QRgb pixel = m_imagesource.pixel(x, y);
     //从内存中读取指定的坐标数据
     return qGray(pixel);
     //将彩色转化为黑白
@@ -65,5 +65,5 @@ bool ImageProcessor::isOccupied(int x, int y) {
     }
     return false;      // 灰色或白色区域，禁止标注
 }
-int ImageProcessor::mapWidth() const { return m_image.width(); }
-int ImageProcessor::mapHeight() const { return m_image.height(); }
+int ImageProcessor::mapWidth() const { return m_imagesource.width(); }
+int ImageProcessor::mapHeight() const { return m_imagesource.height(); }

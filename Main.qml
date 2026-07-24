@@ -132,9 +132,13 @@ ApplicationWindow {
         }
     }
     RowLayout{
+                       //导航栏下的整个界面
                    anchors.top: topNavBar.bottom
+                   //页面顶部在导航栏之下
                    anchors.bottom: parent.bottom
+                   //页面底部和整体父容器底部一样
                    width: parent.width
+                   //页面宽度和整体父容器一样
                    spacing: 0
     Rectangle//左侧导航栏
     {
@@ -150,8 +154,9 @@ ApplicationWindow {
                            Layout.preferredHeight: 60
                            text: "指令"
                            onClicked:currentPageIndex = 0
+                           //点击跳转第1页
                            background: Rectangle {
-                                      // 如果当前是第0页，显示蓝色背景，否则透明
+                                      // 如果当前是第1页，显示蓝色背景，否则透明
                                       color: (currentPageIndex === 0) ? "#3498db" : "transparent"
           }
                            Rectangle {
@@ -172,7 +177,7 @@ ApplicationWindow {
                    Layout.preferredHeight: 60
                    text: "控制"
 
-                           // 点击时跳转到第 1 页
+                           // 点击时跳转到第 2 页
                    onClicked: currentPageIndex = 1
                    background: Rectangle {
                    color: (currentPageIndex === 1) ? "#3498db" : "transparent"
@@ -193,7 +198,7 @@ ApplicationWindow {
                    Layout.preferredHeight: 60
                    text: "设置"
 
-                           // 点击时跳转到第 2 页
+                           // 点击时跳转到第 3 页
                    onClicked: currentPageIndex = 2
                    background: Rectangle {
                    color: (currentPageIndex === 2) ? "#3498db" : "transparent"
@@ -214,7 +219,7 @@ ApplicationWindow {
                    Layout.preferredHeight: 60
                    text: "导航"
 
-                           // 点击时跳转到第 3 页
+                           // 点击时跳转到第 4 页
                    onClicked: currentPageIndex = 3
                    background: Rectangle {
                    color: (currentPageIndex === 3) ? "#3498db" : "transparent"
@@ -230,9 +235,29 @@ ApplicationWindow {
                    verticalAlignment: Text.AlignVCenter
                                       }
                    }
+                   Button {
+                   Layout.fillWidth: true
+                   Layout.preferredHeight: 60
+                   text: "作图"
 
+                           // 点击时跳转到第 5 页
+                   onClicked: currentPageIndex = 4
+                   background: Rectangle {
+                   color: (currentPageIndex === 4)? "#3498db" : "transparent"
+                   Rectangle {
+                   width: 4; height: parent.height; color: "#2980b9"
+                   visible: (currentPageIndex === 4)
+                                      }
+                   }
+                   contentItem: Text {
+                   text: parent.text
+                   color: (currentPageIndex === 4) ? "white" : "black"
+                   horizontalAlignment: Text.AlignHCenter
+                   verticalAlignment: Text.AlignVCenter
+                                      }
+                   }
     }
-    }
+                   }
     StackLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -806,12 +831,12 @@ ApplicationWindow {
                                anchors.horizontalCenter: parent.horizontalCenter
                                anchors.topMargin: 20
                                onClicked: {
-                                                  if(!root.checkServoReady())return;
                                    imageItem.source = "qrc:/lab_7.6.png"
                                }
                            }
                    Rectangle {
                    id: mapContainer
+                   color: "#E0E0E0"
                    anchors.top: loadBtn.bottom
                    anchors.left: parent.left
                    anchors.right: parent.right
@@ -931,8 +956,79 @@ ApplicationWindow {
                    // 绑定旋转角度
                    rotation: imagePage.currentAngle
                    }
+    }               
     }
-    }
+    Rectangle{
+                   color: "#E0E0E0"
+                   anchors.fill: parent
+                   Button{
+                   id:loadbtn_1
+                   text: "加载图片"
+                   anchors.top:parent.top
+                   anchors.horizontalCenter: parent.horizontalCenter
+                   anchors.topMargin: 20
+                   onClicked: {
+                            imageItem_1.source = "image://mapProvider"
+                   }
+                   }
+                   Image{
+                            id:imageItem_1
+                            anchors.top: loadbtn_1.bottom
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right:parent.right
+                            anchors.margins: 30
+                            fillMode: Image.PreserveAspectFit
+                            MouseArea {
+                                        id: mouseArea
+                                        anchors.fill: parent
+                                        enabled: imageItem_1.source !== ""  // 只有加载了图片后才能画
+
+                                        // 记录起点坐标
+                                        property real startX: 0
+                                        property real startY: 0
+                                        property bool isDrawing: false
+
+                                        onPressed: {
+                                            // 鼠标按下，记录起点
+                                            startX = mouse.x
+                                            startY = mouse.y
+                                            isDrawing = true
+                                        }
+
+                                        onPositionChanged: {
+                                            if (isDrawing) {
+                                                // 鼠标拖动时，调用 C++ 的 drawLine 画线
+                                                mapProvider.drawLine(
+                                                    startX, startY,  // 起点
+                                                    mouse.x, mouse.y, // 终点（当前鼠标位置）
+                                                    2,               // 线宽
+                                                    "black"          // 颜色
+                                                )
+                                                // 更新起点，实现连续画线效果
+                                                startX = mouse.x
+                                                startY = mouse.y
+                                            }
+                                        }
+
+                                        onReleased: {
+                                            // 鼠标松开，结束绘制
+                                            isDrawing = false
+                                        }
+                                        Button {
+                                            text: "清空画布"
+                                            anchors.top: loadbtn_1.bottom
+                                            anchors.left: loadbtn_1.right
+                                            anchors.leftMargin: 20
+                                            anchors.topMargin: 20
+                                            onClicked: {
+                                                MapImageProvider.clearMap()
+                                                imageItem_1.source = ""  // 先清空source
+                                                imageItem_1.source = "image://mapProvider"  // 重新加载，触发刷新
+                                            }
+                                        }
+                   }
+                   }
     }
 }
     Popup{
@@ -1020,4 +1116,5 @@ ApplicationWindow {
     var success = mapReader.loadMap(path);
 
  }
+}
 }
