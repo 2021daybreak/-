@@ -15,10 +15,9 @@ int main(int argc, char *argv[])
     //声明一个叫ImageProcessor的C++类
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("tcpManager", &TcpClient);
-    //声明tcpManager对应C++里的TcpClient
     engine.rootContext()->setContextProperty("mapProcessor", &mapProcessor);
+    engine.rootContext()->setContextProperty("mapProvider", imageProvider);
     engine.addImageProvider("mapProvider", imageProvider);
-    //注册图片
     const QUrl url(QStringLiteral("qrc:/qt/qml/server_test/Main.qml"));
     QObject::connect(
         &engine,

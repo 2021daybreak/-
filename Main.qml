@@ -4,6 +4,7 @@ import QtQuick.Controls 2.15
 //Qt按钮，文本框
 import QtQuick.Layouts
 import MyMapTools 1.0
+import QtQuick.Dialogs
 ApplicationWindow {
     id:root
     visible: true
@@ -699,7 +700,7 @@ ApplicationWindow {
             errorText.visible = false
         }
 }
-}
+    }
     Rectangle {
         id: runPage
         anchors.fill: parent
@@ -709,8 +710,7 @@ ApplicationWindow {
         anchors.fill: parent
     Grid{              columns: 2
                        spacing: 10
-                       anchors.top:parent.top
-                       anchors.left:parent.left
+                       anchors.fill: parent
                        anchors.margins:20
                        TextField{
                            id:instruction_1 ; text:"";width: 120;height:40;
@@ -979,58 +979,84 @@ ApplicationWindow {
                             anchors.right:parent.right
                             anchors.margins: 30
                             fillMode: Image.PreserveAspectFit
+
+                            // 坐标转换函数：将鼠标坐标转换为图片像素坐标
+                            function mouseToPixel(mouseX, mouseY) {
+                                // 计算图片显示区域的偏移（留白）
+                                var offsetX = (imageItem_1.width - imageItem_1.paintedWidth) / 2
+                                var offsetY = (imageItem_1.height - imageItem_1.paintedHeight) / 2
+
+                                // 计算缩放因子
+                                var scale = imageItem_1.sourceSize.width / imageItem_1.paintedWidth
+                                if (scale <= 0) scale = 1
+
+                                // 转换为图片像素坐标
+                                var pixelX = (mouseX - offsetX) * scale
+                                var pixelY = (mouseY - offsetY) * scale
+
+                                return { x: pixelX, y: pixelY }
+                            }
+
                             MouseArea {
                                         id: mouseArea
                                         anchors.fill: parent
-                                        enabled: imageItem_1.source !== ""  // 只有加载了图片后才能画
+                                        enabled: imageItem_1.source !== ""
 
-                                        // 记录起点坐标
                                         property real startX: 0
                                         property real startY: 0
                                         property bool isDrawing: false
 
-                                        onPressed: {
-                                            // 鼠标按下，记录起点
-                                            startX = mouse.x
-                                            startY = mouse.y
+                                        onPressed: function(mouse) {
+                                            var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
+                                            startX = pos.x
+                                            startY = pos.y
                                             isDrawing = true
                                         }
 
-                                        onPositionChanged: {
+                                        onPositionChanged: function(mouse) {
                                             if (isDrawing) {
-                                                // 鼠标拖动时，调用 C++ 的 drawLine 画线
+                                                var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
                                                 mapProvider.drawLine(
-                                                    startX, startY,  // 起点
-                                                    mouse.x, mouse.y, // 终点（当前鼠标位置）
-                                                    2,               // 线宽
-                                                    "black"          // 颜色
+                                                    startX, startY,
+                                                    pos.x, pos.y,
+                                                    2,
+                                                    "black"
                                                 )
-                                                // 更新起点，实现连续画线效果
-                                                startX = mouse.x
-                                                startY = mouse.y
+                                                startX = pos.x
+                                                startY = pos.y
+                                                imageItem_1.source = ""
+                                                imageItem_1.source = "image://mapProvider?" + Math.random()
                                             }
                                         }
 
-                                        onReleased: {
-                                            // 鼠标松开，结束绘制
+                                        onReleased: function(mouse) {
                                             isDrawing = false
                                         }
-                                        Button {
-                                            text: "清空画布"
-                                            anchors.top: loadbtn_1.bottom
-                                            anchors.left: loadbtn_1.right
-                                            anchors.leftMargin: 20
-                                            anchors.topMargin: 20
-                                            onClicked: {
-                                                MapImageProvider.clearMap()
-                                                imageItem_1.source = ""  // 先清空source
-                                                imageItem_1.source = "image://mapProvider"  // 重新加载，触发刷新
-                                            }
-                                        }
                    }
+                            }
+                            Button {
+                                text: "清空画布"
+                                id:loadbtn_2
+                                anchors.top: loadbtn_1.bottom
+                                anchors.leftMargin: 20
+                                anchors.topMargin: 20
+                                onClicked: {
+                                    mapProvider.clearMap()
+                                    imageItem_1.source = ""
+                                    imageItem_1.source = "image://mapProvider"
+                                }
+                            }
+                            Button{
+                                text:"保存画布"
+                                id:loadbtn_3
+                                anchors.top:loadbtn_2.bottom
+                                anchors.leftMargin: 20
+                                anchors.topMargin:20
+                                onClicked: saveDialog.open()
+                            }
                    }
     }
-}
+    }
     Popup{
             id: modePopup
 
@@ -1045,7 +1071,7 @@ ApplicationWindow {
                 width: 170
                 height: 190
                 color: "#E0E0E0"
-                border.color: "#999"
+                border.color: "#534646ff"
                 radius: 5
                 Column {
                     anchors.fill: parent
@@ -1110,11 +1136,30 @@ ApplicationWindow {
                        return true;
                        }
     ImageProcessor {
-        id: mapReader       }
- Component.onCompleted: {
-    var path = "qrc:/lab_7.6.png";
-    var success = mapReader.loadMap(path);
+        id: mapReader
+    }
 
- }
-}
+    Component.onCompleted: {
+        var path = "qrc:/lab_7.6.png";
+        var success = mapReader.loadMap(path);
+    }
+
+    FileDialog {
+        id: saveDialog
+        title: "选择保存位置"
+        fileMode: FileDialog.SaveFile
+        nameFilters: [
+            "PNG 图片 (*.png)",
+            "所有文件 (*)"
+        ]
+        defaultSuffix: "png"
+
+        onAccepted: {
+            var path = selectedFile.toString()
+            if (path.startsWith("file:///")) {
+                path = path.substring(8)
+            }
+            mapProvider.saveAsPng(path)
+        }
+    }
 }
