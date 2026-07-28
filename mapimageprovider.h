@@ -12,12 +12,12 @@ public:
     MapImageProvider();
     QImage requestImage(const QString &id, QSize *size, const QSize &requestedSize) override;
     void createBlankMap(int width = 349, int height = 259);
-    bool loadFromPng(const QString &path);
 
     const QImage& image() const { return m_image; }
     const QString& currentPath() const { return m_currentPath; }
     void setCurrentPath(const QString& path) { m_currentPath = path; }
 public slots:
+    bool loadFromPng(const QString &path);
     bool saveAsPng(const QString &path);
     void drawLine(int x1, int y1, int x2, int y2, int width = 2, const QColor &color = Qt::black);
     void clearMap();

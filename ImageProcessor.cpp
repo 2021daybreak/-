@@ -5,8 +5,13 @@
 #include <QDir>
 ImageProcessor::ImageProcessor(QObject *parent) : QObject(parent) {loadMap("");}
 bool ImageProcessor::loadMap(const QString &path) {
-    QString realPath = QStringLiteral(":/lab_7.6.png");
-    qDebug() << "正在尝试加载";
+    QString realPath;
+    if (path.isEmpty()) {
+        realPath = QStringLiteral(":/lab_7.6.png");
+    } else {
+        realPath = path;
+    }
+    qDebug() << "正在尝试加载:" << realPath;
     QFile file(realPath);
     if (!file.open(QIODevice::ReadOnly)) {
         qDebug() << " 错误: 无法打开文件，错误信息:" << file.errorString();

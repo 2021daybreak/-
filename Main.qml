@@ -834,15 +834,170 @@ ApplicationWindow {
                                    imageItem.source = "qrc:/lab_7.6.png"
                                }
                            }
-                   Rectangle {
-                   id: mapContainer
-                   color: "#E0E0E0"
-                   anchors.top: loadBtn.bottom
-                   anchors.left: parent.left
-                   anchors.right: parent.right
-                   anchors.bottom: parent.bottom
-                   anchors.margins: 10 // 这里的 margins 只是为了让容器离边远点，不影响内部坐标
-                   Image {
+
+                   // 外层 RowLayout：左边输入框，右边地图
+                   RowLayout {
+                       anchors.top: loadBtn.bottom
+                       anchors.left: parent.left
+                       anchors.right: parent.right
+                       anchors.bottom: parent.bottom
+                       anchors.topMargin: 10
+                       anchors.leftMargin: 10
+                       anchors.rightMargin: 10
+                       anchors.bottomMargin: 10
+                       spacing: 10
+
+                       // 左边：输入框区域（垂直排列）
+                       ColumnLayout {
+                           id: inputArea
+                           spacing: 10
+                           Layout.preferredWidth: 180
+
+                           // X 输入框
+                           Row {
+                               spacing: 5
+                               Text { text: "X:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               TextField {
+                                   id: inputX; text: "0"; width: 130
+                                   validator: DoubleValidator {
+                                       bottom: -3.8
+                                       top: 13.6
+                                   }
+                                   background: Rectangle {
+                                       border.color: inputX.acceptableInput ? "white" : "red"
+                                       border.width: 2
+                                   }
+                               }
+                           }
+
+                           // Y 输入框
+                           Row {
+                               spacing: 5
+                               Text { text: "Y:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               TextField {
+                                   id: inputY; text: "0"; width: 130
+                                   validator: DoubleValidator {
+                                       bottom: -5.55
+                                       top: 7.35
+                                   }
+                                   background: Rectangle {
+                                       border.color: inputY.acceptableInput ? "white" : "red"
+                                       border.width: 2
+                                   }
+                               }
+                           }
+
+                           // qz 输入框
+                           Row {
+                               spacing: 5
+                               Text { text: "qz:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               TextField {
+                                   id: inputQz; text: "0"; width: 130
+                                   validator: DoubleValidator {
+                                       bottom: -1
+                                       top: 1
+                                   }
+                                   background: Rectangle {
+                                       border.color: inputQz.acceptableInput ? "white" : "red"
+                                       border.width: 2
+                                   }
+                               }
+                           }
+
+                           // qw 输入框
+                           Row {
+                               spacing: 5
+                               Text { text: "qw:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               TextField {
+                                   id: inputQw; text: "1"; width: 130
+                                   validator: DoubleValidator {
+                                       bottom: -1
+                                       top: 1
+                                   }
+                                   background: Rectangle {
+                                       border.color: inputQw.acceptableInput ? "white" : "red"
+                                       border.width: 2
+                                   }
+                               }
+                           }
+
+                           // 发送按钮
+                           Button {
+                               text: "发送"
+                               width: 160
+                               onClicked: {
+                                   if (!root.checkServoReady()) return;
+                                   if (!inputX.acceptableInput || !inputY.acceptableInput ||
+                                       !inputQz.acceptableInput || !inputQw.acceptableInput) {
+                                       return;
+                                   }
+
+                                   var worldX = parseFloat(inputX.text);
+                                   var worldY = parseFloat(inputY.text);
+                                   var qz = parseFloat(inputQz.text);
+                                   var qw = parseFloat(inputQw.text);
+
+                                   var pixelX = (worldX - root.mapOriginX) / root.mapResolution;
+                                   var pixelY = imageItem.sourceSize.height - (worldY - root.mapOriginY) / root.mapResolution;
+
+                                   if (pixelX < 0 || pixelX >= imageItem.sourceSize.width ||
+                                       pixelY < 0 || pixelY >= imageItem.sourceSize.height) {
+                                       marker.visible = false;
+                                       arrow.visible = false;
+                                       return;
+                                   }
+
+                                   if (!mapProcessor.isOccupied(pixelX, pixelY)) {
+                                       var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;
+                                       var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
+                                       var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
+
+                                       var displayX = paintedX + pixelX * scaleFactor;
+                                       var displayY = paintedY + pixelY * scaleFactor;
+
+                                       marker.x = displayX - marker.width / 2;
+                                       marker.y = displayY - marker.height / 2;
+                                       marker.visible = true;
+
+                                       arrow.x = displayX;
+                                       arrow.y = displayY - arrow.height / 2;
+                                       arrow.visible = true;
+
+                                       var thetaRad = 2.0 * Math.atan2(qz, qw);
+                                       if (qz < 0) thetaRad = -thetaRad;
+                                       var deg = -thetaRad * (180 / Math.PI);
+                                       arrow.rotation = deg;
+                                       imagePage.currentAngle = deg;
+
+                                       var messageLocation = worldX.toFixed(3) + "," +
+                                                           worldY.toFixed(3) + "," +
+                                                           qz.toFixed(4) + "," +
+                                                           qw.toFixed(4);
+                                       tcpManager.sendMessage("1007:" + messageLocation);
+                                   } else {
+                                       marker.visible = false;
+                                       arrow.visible = false;
+                                   }
+                               }
+                           }
+
+                           // 选择图片按钮
+                           Button {
+                               text: "选择图片"
+                               width: 160
+                               onClicked: {
+                                   openFileDialog.open()
+                               }
+                           }
+                       }
+
+                       // 右边：地图容器
+                       Rectangle {
+                           id: mapContainer
+                           color: "#E0E0E0"
+                           Layout.fillHeight: true
+                           Layout.fillWidth: true
+                           Image {
                                id: imageItem
                                anchors.fill: parent // 填满容器
                                fillMode: Image.PreserveAspectFit
@@ -937,30 +1092,51 @@ ApplicationWindow {
                                asynchronous: true  // 异步加载，避免大图卡顿
                            }
 
-                   Rectangle {
-                           id: marker
-                           width: 10; height: 10
-                           radius: 5
-                           color: "black"
-                           visible: false
-                           z:10
+                           // marker 和 arrow 在 mapContainer 内部
+                           Rectangle {
+                               id: marker
+                               width: 10; height: 10
+                               radius: 5
+                               color: "black"
+                               visible: false
+                               z:10
+                           }
+                           Image{
+                               id:arrow
+                               width: 40
+                               height: 40
+                               source:"qrc:/arrow.png"
+                               visible:false
+                               z:20
+                               transformOrigin: Item.Left
+                               rotation: imagePage.currentAngle
+                           }
+                       } // 关闭 mapContainer
+                   } // 关闭外层 RowLayout
+
+                   // 文件选择对话框
+                   FileDialog {
+                       id: openFileDialog
+                       title: "选择地图图片"
+                       nameFilters: [
+                           "PNG 图片 (*.png)",
+                           "所有文件 (*)"
+                       ]
+                       onAccepted: {
+                           var filePath = openFileDialog.selectedFile.toString()
+                           imageItem.source = filePath
+                           if (filePath.startsWith("file:///")) {
+                               filePath = filePath.substring(8)
+                           }
+                           mapProcessor.loadMap(filePath)
                        }
-                   Image{
-                          id:arrow
-                          width: 40
-                          height: 40
-                          source:"qrc:/arrow.png"
-                          visible:false
-                          z:20
-                          transformOrigin: Item.Left
-                   // 绑定旋转角度
-                   rotation: imagePage.currentAngle
                    }
-    }               
     }
     Rectangle{
+                   id: page5
                    color: "#E0E0E0"
                    anchors.fill: parent
+                   property string loadedImagePath: ""
                    Button{
                    id:loadbtn_1
                    text: "加载图片"
@@ -968,7 +1144,7 @@ ApplicationWindow {
                    anchors.horizontalCenter: parent.horizontalCenter
                    anchors.topMargin: 20
                    onClicked: {
-                            imageItem_1.source = "image://mapProvider"
+                            page5FileDialog.open()
                    }
                    }
                    Image{
@@ -1041,9 +1217,11 @@ ApplicationWindow {
                                 anchors.leftMargin: 20
                                 anchors.topMargin: 20
                                 onClicked: {
-                                    mapProvider.clearMap()
-                                    imageItem_1.source = ""
-                                    imageItem_1.source = "image://mapProvider"
+                                    if (page5.loadedImagePath !== "") {
+                                        mapProvider.loadFromPng(page5.loadedImagePath)
+                                        imageItem_1.source = ""
+                                        imageItem_1.source = "image://mapProvider"
+                                    }
                                 }
                             }
                             Button{
@@ -1053,6 +1231,26 @@ ApplicationWindow {
                                 anchors.leftMargin: 20
                                 anchors.topMargin:20
                                 onClicked: saveDialog.open()
+                            }
+
+                            // 第5页面的文件选择对话框
+                            FileDialog {
+                                id: page5FileDialog
+                                title: "选择图片"
+                                nameFilters: [
+                                    "PNG 图片 (*.png)",
+                                    "所有文件 (*)"
+                                ]
+                                onAccepted: {
+                                var filePath = page5FileDialog.selectedFile.toString()
+                                if (filePath.startsWith("file:///")) {
+                                    filePath = filePath.substring(8)
+                                }
+                                page5.loadedImagePath = filePath
+                                mapProvider.loadFromPng(filePath)
+                                imageItem_1.source = ""
+                                imageItem_1.source = "image://mapProvider"
+                                }
                             }
                    }
     }
