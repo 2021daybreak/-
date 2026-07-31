@@ -26,7 +26,18 @@ void MapImageProvider::createBlankMap(int width, int height)
 
 bool MapImageProvider::loadFromPng(const QString &path)
 {
-    QImage tempImage(path);
+    QImage tempImage;
+
+    // 获取文件扩展名并转为小写
+    QString ext = path.right(4).toLower();
+
+    // 根据扩展名加载图片
+    if (ext == ".pgm") {
+        tempImage.load(path, "PGM");
+    } else {
+        tempImage.load(path);  // Qt 自动检测格式（PNG等）
+    }
+
     if (tempImage.isNull()) {
         return false; // 加载失败
     }

@@ -707,7 +707,10 @@ ApplicationWindow {
         color: "#f0f0f0" // 浅灰色背景
     Item {
         id: container
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: parent.height * 0.5
     Grid{              columns: 2
                        spacing: 10
                        anchors.fill: parent
@@ -733,6 +736,121 @@ ApplicationWindow {
                                           tcpManager.sendMessage("1005:"+instruction_1.text)}
                        }
               }
+    }
+    Item{
+                       id:gamepadRoot
+                       anchors.left: parent.left
+                       anchors.right: parent.right
+                       anchors.top: container.bottom
+                       anchors.bottom: parent.bottom
+                       property real maxLinearVel: 0.6        // m/s
+                       property real maxAngularVel: 0.7       // rad/s
+                       property real maxLinearAccel: 0.8      // m/s²
+                       property real maxAngularAccel: 3.0    // rad/s²
+                       property real linearVel: 0            // current linear velocity
+                       property real angularVel: 0           // current angular velocity
+                       property real joystickCenterX: 0
+                       property real joystickCenterY: 0
+
+                       function updateVelocities() {
+                           // Calculate normalized joystick output [-1, 1]
+                           var normX = 0
+                           var normY = 0
+                           if (joystickCenterX !== 0 && joystickCenterY !== 0) {
+                               //计算摇杆偏离中心多少像素
+                               normX = (stickKnob.x - joystickCenterX) / 25.0
+                               normY = (stickKnob.y - joystickCenterY) / 25.0
+                               // 变到+1到-1的比例值
+                               normX = Math.max(-1, Math.min(1, normX))
+                               normY = Math.max(-1, Math.min(1, normY))
+                           }
+
+                           // 目标速度
+                           var targetLinear = -normY * maxLinearVel   // 线性速度，向上为正
+                           var targetAngular = normX * maxAngularVel  // 角速度向，向右为正
+
+                           // linDiff,目标速度和当前速度的差距
+                           var linDiff = targetLinear - linearVel
+                           var maxLinDelta = maxLinearAccel * 0.05  // 在16ms，60fps最多允许变化的速度量
+                           if (Math.abs(linDiff) < maxLinDelta) {
+                               linearVel = targetLinear
+                           } else {
+                               linearVel += Math.sign(linDiff) * maxLinDelta
+                           }
+
+                           // 角速度加速度限制
+                           var angDiff = targetAngular - angularVel
+                           var maxAngDelta = maxAngularAccel * 0.05
+                           if (Math.abs(angDiff) < maxAngDelta) {
+                               angularVel = targetAngular
+                           } else {
+                               angularVel += Math.sign(angDiff) * maxAngDelta
+                           }
+                       }
+
+                       Timer {
+                           interval: 50
+                           running: true
+                           repeat: true
+                           onTriggered:{ gamepadRoot.updateVelocities()
+                           var epsilon =0.001;
+                           if (Math.abs(gamepadRoot.linearVel)>epsilon||Math.abs(gamepadRoot.angularVel)>epsilon){
+                           tcpManager.sendMessage("1008:"+gamepadRoot.linearVel.toFixed(2)+","+gamepadRoot.angularVel.toFixed(2))}
+                       }
+}
+                       Rectangle{
+                       id:body_gamepad
+                       anchors.fill: parent
+                       color:"#f0f0f0"
+                       }
+                       Item{
+                                      id: joystickComponent
+                                      anchors.centerIn: parent
+                                      width: 120
+                                      height: 120
+
+
+                       Rectangle{
+                       id:stickBase
+                       anchors.centerIn: parent
+                       x: (gamepadRoot.width - width) / 2
+                       y: (gamepadRoot.height - height) / 2
+                       width: 100
+                       height: 100
+                       radius: 50
+                       color: "#FFFAFA"
+                       border.color: "#555"
+                       border.width: 2
+                       }
+                       Rectangle {
+                                   id: stickKnob
+                                   width: 50
+                                   height: 50
+                                   radius: 25
+                                   color: "#00BFFF"
+                                   x: stickBase.x + 25
+                                   y: stickBase.y + 25
+                                   MouseArea {
+                                       anchors.fill: parent
+                                       drag.target: stickKnob
+                                               drag.axis: Drag.XAndYAxis
+                                               drag.minimumX: stickBase.x
+                                               drag.maximumX: stickBase.x + 50
+                                               drag.minimumY: stickBase.y
+                                               drag.maximumY: stickBase.y + 50
+
+                                               onReleased: {
+                                                   stickKnob.x = stickBase.x + 25
+                                                   stickKnob.y = stickBase.y + 25
+                                               }
+                                   }
+                               }
+    }
+
+    Component.onCompleted: {
+        joystickCenterX = stickBase.x + 25
+        joystickCenterY = stickBase.y + 25
+    }
     }
     }
     Rectangle{
@@ -821,23 +939,54 @@ ApplicationWindow {
                    color: "#E0E0E0"
                    anchors.fill: parent
                    property real currentAngle: 0
+                   property bool updatingQz: false
+                   property bool updatingQw: false
+                   function checkAndUpdateMarker() {
+                       if (!inputX.acceptableInput || !inputY.acceptableInput ||
+                           !inputQz.acceptableInput || !inputQw.acceptableInput) {
+                           return;
+                       }
+                       updateMarker();
+                   }
+                   function updateMarker() {
+                       var worldX = parseFloat(inputX.text);
+                       var worldY = parseFloat(inputY.text);
+                       var qz = parseFloat(inputQz.text);
+                       var qw = parseFloat(inputQw.text);
+                       
+                       // 世界坐标转像素坐标
+                       var pixelX = (worldX - mapOriginX) / mapResolution;
+                       var pixelY = (imageItem.sourceSize.height - (worldY - mapOriginY) / mapResolution);
+                       
+                       // 像素坐标转显示坐标
+                       var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
+                       var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;
+                       var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
+                       
+                       var displayX = paintedX + pixelX * scaleFactor;
+                       var displayY = paintedY + pixelY * scaleFactor;
+                       
+                       // 四元数转角度
+                       var angleRad = 2 * Math.atan2(qz, qw);
+                       var angleDeg = angleRad * 180 / Math.PI;
+                       
+                       marker.x = displayX - marker.width / 2;
+                       marker.y = displayY - marker.height / 2;
+                       marker.visible = true;
+                       
+                       imagePage.currentAngle = angleDeg;
+                       arrow.x = displayX;
+                       arrow.y = displayY - arrow.height / 2;
+                       arrow.rotation = angleDeg;
+                       arrow.visible = true;
+                   }
                    Component.onCompleted: {
                        targetPos = Qt.point(0, 0)
                    }
-                   Button {
-                               id: loadBtn
-                               text: "加载图片"
-                               anchors.top: parent.top
-                               anchors.horizontalCenter: parent.horizontalCenter
-                               anchors.topMargin: 20
-                               onClicked: {
-                                   imageItem.source = "qrc:/lab_7.6.png"
-                               }
-                           }
 
                    // 外层 RowLayout：左边输入框，右边地图
                    RowLayout {
-                       anchors.top: loadBtn.bottom
+                       anchors.top: parent.top
                        anchors.left: parent.left
                        anchors.right: parent.right
                        anchors.bottom: parent.bottom
@@ -867,6 +1016,9 @@ ApplicationWindow {
                                        border.color: inputX.acceptableInput ? "white" : "red"
                                        border.width: 2
                                    }
+                                   onTextChanged: {
+                                       imagePage.checkAndUpdateMarker();
+                                   }
                                }
                            }
 
@@ -883,6 +1035,9 @@ ApplicationWindow {
                                    background: Rectangle {
                                        border.color: inputY.acceptableInput ? "white" : "red"
                                        border.width: 2
+                                   }
+                                   onTextChanged: {
+                                       imagePage.checkAndUpdateMarker();
                                    }
                                }
                            }
@@ -901,6 +1056,18 @@ ApplicationWindow {
                                        border.color: inputQz.acceptableInput ? "white" : "red"
                                        border.width: 2
                                    }
+                                   onTextChanged: {
+                                       if (imagePage.updatingQz) return;
+                                       var qzVal = parseFloat(inputQz.text);
+                                       if (isNaN(qzVal)) return;
+                                       if (qzVal > 1) qzVal = 1;
+                                       if (qzVal < -1) qzVal = -1;
+                                       var qwVal = Math.sqrt(1 - qzVal * qzVal);
+                                       imagePage.updatingQw = true;
+                                       inputQw.text = qwVal.toFixed(4);
+                                       imagePage.updatingQw = false;
+                                       imagePage.checkAndUpdateMarker();
+                                   }
                                }
                            }
 
@@ -917,6 +1084,18 @@ ApplicationWindow {
                                    background: Rectangle {
                                        border.color: inputQw.acceptableInput ? "white" : "red"
                                        border.width: 2
+                                   }
+                                   onTextChanged: {
+                                       if (imagePage.updatingQw) return;
+                                       var qwVal = parseFloat(inputQw.text);
+                                       if (isNaN(qwVal)) return;
+                                       if (qwVal > 1) qwVal = 1;
+                                       if (qwVal < -1) qwVal = -1;
+                                       var qzVal = Math.sqrt(1 - qwVal * qwVal);
+                                       imagePage.updatingQz = true;
+                                       inputQz.text = qzVal.toFixed(4);
+                                       imagePage.updatingQz = false;
+                                       imagePage.checkAndUpdateMarker();
                                    }
                                }
                            }
@@ -937,47 +1116,11 @@ ApplicationWindow {
                                    var qz = parseFloat(inputQz.text);
                                    var qw = parseFloat(inputQw.text);
 
-                                   var pixelX = (worldX - root.mapOriginX) / root.mapResolution;
-                                   var pixelY = imageItem.sourceSize.height - (worldY - root.mapOriginY) / root.mapResolution;
-
-                                   if (pixelX < 0 || pixelX >= imageItem.sourceSize.width ||
-                                       pixelY < 0 || pixelY >= imageItem.sourceSize.height) {
-                                       marker.visible = false;
-                                       arrow.visible = false;
-                                       return;
-                                   }
-
-                                   if (!mapProcessor.isOccupied(pixelX, pixelY)) {
-                                       var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;
-                                       var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
-                                       var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
-
-                                       var displayX = paintedX + pixelX * scaleFactor;
-                                       var displayY = paintedY + pixelY * scaleFactor;
-
-                                       marker.x = displayX - marker.width / 2;
-                                       marker.y = displayY - marker.height / 2;
-                                       marker.visible = true;
-
-                                       arrow.x = displayX;
-                                       arrow.y = displayY - arrow.height / 2;
-                                       arrow.visible = true;
-
-                                       var thetaRad = 2.0 * Math.atan2(qz, qw);
-                                       if (qz < 0) thetaRad = -thetaRad;
-                                       var deg = -thetaRad * (180 / Math.PI);
-                                       arrow.rotation = deg;
-                                       imagePage.currentAngle = deg;
-
-                                       var messageLocation = worldX.toFixed(3) + "," +
-                                                           worldY.toFixed(3) + "," +
-                                                           qz.toFixed(4) + "," +
-                                                           qw.toFixed(4);
-                                       tcpManager.sendMessage("1007:" + messageLocation);
-                                   } else {
-                                       marker.visible = false;
-                                       arrow.visible = false;
-                                   }
+                                   var messageLocation = worldX.toFixed(3) + "," +
+                                                       worldY.toFixed(3) + "," +
+                                                       qz.toFixed(4) + "," +
+                                                       qw.toFixed(4);
+                                   tcpManager.sendMessage("1007:" + messageLocation);
                                }
                            }
 
@@ -987,6 +1130,15 @@ ApplicationWindow {
                                width: 160
                                onClicked: {
                                    openFileDialog.open()
+                               }
+                           }
+
+                           // SSH下载图片按钮
+                           Button {
+                               text: "SSH下载图片"
+                               width: 160
+                               onClicked: {
+                                   sshManager.startDownload()
                                }
                            }
                        }
@@ -1137,6 +1289,7 @@ ApplicationWindow {
                    color: "#E0E0E0"
                    anchors.fill: parent
                    property string loadedImagePath: ""
+                   property string penColor: "black"
                    Button{
                    id:loadbtn_1
                    text: "加载图片"
@@ -1172,7 +1325,16 @@ ApplicationWindow {
 
                                 return { x: pixelX, y: pixelY }
                             }
+                            function pixelToWorld(pixelX, pixelY) {
+                                // X 轴转换
+                                var worldX = mapOriginX + (pixelX * mapResolution);
 
+                                // Y 轴转换 (注意：图片Y轴向下，地图Y轴向上，需要翻转)
+                                // imageItem_1.sourceSize.height 是图片原始高度
+                                var worldY = mapOriginY + ((imageItem_1.sourceSize.height - pixelY) * mapResolution);
+
+                                return { x: worldX, y: worldY };
+                            }
                             MouseArea {
                                         id: mouseArea
                                         anchors.fill: parent
@@ -1181,7 +1343,8 @@ ApplicationWindow {
                                         property real startX: 0
                                         property real startY: 0
                                         property bool isDrawing: false
-
+                                        property real currentWorldX: 0
+                                        property real currentWorldY: 0
                                         onPressed: function(mouse) {
                                             var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
                                             startX = pos.x
@@ -1192,11 +1355,14 @@ ApplicationWindow {
                                         onPositionChanged: function(mouse) {
                                             if (isDrawing) {
                                                 var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
+                                                var worldPos = imageItem_1.pixelToWorld(pos.x, pos.y);
+                                                currentWorldX = Number(worldPos.x.toFixed(2));
+                                                currentWorldY = Number(worldPos.y.toFixed(2));
                                                 mapProvider.drawLine(
                                                     startX, startY,
                                                     pos.x, pos.y,
                                                     2,
-                                                    "black"
+                                                    page5.penColor
                                                 )
                                                 startX = pos.x
                                                 startY = pos.y
@@ -1209,7 +1375,20 @@ ApplicationWindow {
                                             isDrawing = false
                                         }
                    }
+
                             }
+
+                   Text{
+                                      id:coordiateText
+                                      anchors.right:parent.right
+                                      anchors.top: parent.top
+                                      anchors.topMargin: 30
+                                      anchors.rightMargin: 30
+                                      text: "横坐标X: " + mouseArea.currentWorldX + "横坐标Y: " + mouseArea.currentWorldY
+                                      font.pixelSize: 16
+                                      color:"black"
+                                      z:10
+                             }
                             Button {
                                 text: "清空画布"
                                 id:loadbtn_2
@@ -1231,6 +1410,26 @@ ApplicationWindow {
                                 anchors.leftMargin: 20
                                 anchors.topMargin:20
                                 onClicked: saveDialog.open()
+                            }
+                            Button{
+                                text:"灰色画笔"
+                                id:loadbtn_4
+                                anchors.top:loadbtn_3.bottom
+                                anchors.leftMargin: 20
+                                anchors.topMargin:20
+                                onClicked: {
+                                    page5.penColor = "#BFBFBF"
+                                }
+                            }
+                            Button{
+                                text:"黑色画笔"
+                                id:loadbtn_5
+                                anchors.top:loadbtn_4.bottom
+                                anchors.leftMargin: 20
+                                anchors.topMargin:20
+                                onClicked: {
+                                    page5.penColor = "black"
+                                }
                             }
 
                             // 第5页面的文件选择对话框

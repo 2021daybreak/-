@@ -4,12 +4,14 @@
 #include "mapimageprovider.h"
 #include "tcpClient.h"
 #include"ImageProcessor.h"
+#include "sshmanager.h"
 //引入头文件
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     TcpClient TcpClient;// 栈上创建
     ImageProcessor mapProcessor;
+    sshmanager sshManager;
     MapImageProvider *imageProvider = new MapImageProvider();
     qmlRegisterType<ImageProcessor>("MyMapTools",1,0,"ImageProcessor");
     //声明一个叫ImageProcessor的C++类
@@ -17,6 +19,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("tcpManager", &TcpClient);
     engine.rootContext()->setContextProperty("mapProcessor", &mapProcessor);
     engine.rootContext()->setContextProperty("mapProvider", imageProvider);
+    engine.rootContext()->setContextProperty("sshManager", &sshManager);
     engine.addImageProvider("mapProvider", imageProvider);
     const QUrl url(QStringLiteral("qrc:/qt/qml/server_test/Main.qml"));
     QObject::connect(

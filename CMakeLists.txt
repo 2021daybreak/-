@@ -31,6 +31,7 @@ qt_add_qml_module(appserver_test
         resource.qrc
         SOURCES
         SOURCES mapimageprovider.h mapimageprovider.cpp
+        SOURCES sshmanager.h sshmanager.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -48,3 +49,8 @@ target_link_libraries(appserver_test
     PRIVATE Qt6::Quick
             Qt6::Network
 )
+#添加QSsh的头文件路径
+#源码目录
+include_directories("C:/Users/sz/Documents/server_test/qssh")
+target_link_libraries(appserver_test PRIVATE
+"C:/Users/sz/Documents/server_test/lib/QSsh.dll")
