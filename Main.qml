@@ -1,4 +1,4 @@
-import QtQuick 2.15
+﻿import QtQuick 2.15
 //Qt基础组件
 import QtQuick.Controls 2.15
 //Qt按钮，文本框
@@ -132,136 +132,12 @@ ApplicationWindow {
                     }
         }
     }
-    RowLayout{
-                       //导航栏下的整个界面
-                   anchors.top: topNavBar.bottom
-                   //页面顶部在导航栏之下
-                   anchors.bottom: parent.bottom
-                   //页面底部和整体父容器底部一样
-                   width: parent.width
-                   //页面宽度和整体父容器一样
-                   spacing: 0
-    Rectangle//左侧导航栏
-    {
-                Layout.preferredWidth: 100  // 核心：限制左侧宽度
-                Layout.fillHeight: true     // 高度跟随父容器
 
-                color: "#87cefa"
-    ColumnLayout {
-                   anchors.fill: parent    // 填满父容器
-                   spacing: 0              // 按钮之间不留缝隙
-                   Button {
-                           Layout.fillWidth: true
-                           Layout.preferredHeight: 60
-                           text: "指令"
-                           onClicked:currentPageIndex = 0
-                           //点击跳转第1页
-                           background: Rectangle {
-                                      // 如果当前是第1页，显示蓝色背景，否则透明
-                                      color: (currentPageIndex === 0) ? "#3498db" : "transparent"
-          }
-                           Rectangle {
-                                           width: 4; height: parent.height; color: "#2980b9"
-                                           visible: (currentPageIndex === 0)
-                                       }
-
-                           contentItem: Text {
-                                       text: parent.text
-                                       // 如果当前是第0页，文字变白，否则深灰
-                                       color: (currentPageIndex === 0) ? "white" : "black"
-                                       horizontalAlignment: Text.AlignHCenter
-                                       verticalAlignment: Text.AlignVCenter
-                                   }
-    }
-                   Button {
-                   Layout.fillWidth: true
-                   Layout.preferredHeight: 60
-                   text: "控制"
-
-                           // 点击时跳转到第 2 页
-                   onClicked: currentPageIndex = 1
-                   background: Rectangle {
-                   color: (currentPageIndex === 1) ? "#3498db" : "transparent"
-                   Rectangle {
-                   width: 4; height: parent.height; color: "#2980b9"
-                   visible: (currentPageIndex === 1)
-                                      }
-                   }
-                   contentItem: Text {
-                   text: parent.text
-                   color: (currentPageIndex === 1) ? "white" : "black"
-                   horizontalAlignment: Text.AlignHCenter
-                   verticalAlignment: Text.AlignVCenter
-                                      }
-                   }
-                   Button {
-                   Layout.fillWidth: true
-                   Layout.preferredHeight: 60
-                   text: "设置"
-
-                           // 点击时跳转到第 3 页
-                   onClicked: currentPageIndex = 2
-                   background: Rectangle {
-                   color: (currentPageIndex === 2) ? "#3498db" : "transparent"
-                   Rectangle {
-                   width: 4; height: parent.height; color: "#2980b9"
-                   visible: (currentPageIndex === 2)
-                                      }
-                   }
-                   contentItem: Text {
-                   text: parent.text
-                   color: (currentPageIndex === 2) ? "white" : "black"
-                   horizontalAlignment: Text.AlignHCenter
-                   verticalAlignment: Text.AlignVCenter
-                                      }
-                   }
-                   Button {
-                   Layout.fillWidth: true
-                   Layout.preferredHeight: 60
-                   text: "导航"
-
-                           // 点击时跳转到第 4 页
-                   onClicked: currentPageIndex = 3
-                   background: Rectangle {
-                   color: (currentPageIndex === 3) ? "#3498db" : "transparent"
-                   Rectangle {
-                   width: 4; height: parent.height; color: "#2980b9"
-                   visible: (currentPageIndex === 3)
-                                      }
-                   }
-                   contentItem: Text {
-                   text: parent.text
-                   color: (currentPageIndex === 3) ? "white" : "black"
-                   horizontalAlignment: Text.AlignHCenter
-                   verticalAlignment: Text.AlignVCenter
-                                      }
-                   }
-                   Button {
-                   Layout.fillWidth: true
-                   Layout.preferredHeight: 60
-                   text: "作图"
-
-                           // 点击时跳转到第 5 页
-                   onClicked: currentPageIndex = 4
-                   background: Rectangle {
-                   color: (currentPageIndex === 4)? "#3498db" : "transparent"
-                   Rectangle {
-                   width: 4; height: parent.height; color: "#2980b9"
-                   visible: (currentPageIndex === 4)
-                                      }
-                   }
-                   contentItem: Text {
-                   text: parent.text
-                   color: (currentPageIndex === 4) ? "white" : "black"
-                   horizontalAlignment: Text.AlignHCenter
-                   verticalAlignment: Text.AlignVCenter
-                                      }
-                   }
-    }
-                   }
     StackLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
+        anchors.top: topNavBar.bottom
+        anchors.bottom: bottomNavBar.top
+        anchors.left: parent.left
+        anchors.right: parent.right
 
         // 关键：绑定到 currentPageIndex
         currentIndex: currentPageIndex
@@ -1453,7 +1329,170 @@ ApplicationWindow {
                             }
                    }
     }
+
+    Rectangle {
+        id: bottomNavBar
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 60
+        color: "#87cefa"
+        RowLayout {
+            anchors.centerIn: parent
+            spacing: 0
+            Button {
+                Layout.preferredWidth: parent.parent.width / 5
+                Layout.preferredHeight: 50
+                text: "指令"
+                onClicked: currentPageIndex = 0
+                background: Rectangle {
+                    color: (currentPageIndex === 0) ? "#3498db" : "transparent"
+                    Rectangle {
+                        width: parent.width; height: 3; color: "#2980b9"
+                        anchors.bottom: parent.bottom
+                        visible: (currentPageIndex === 0)
+                    }
+                }
+                contentItem: Row {
+                    spacing: 4
+                    anchors.centerIn: parent
+                    Image {
+                        source: "qrc:/Robotics.png"
+                        width: 20
+                        height: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: parent.parent.text
+                        color: (currentPageIndex === 0) ? "white" : "black"
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 14
+                    }
+                }
+            }
+            Button {
+                Layout.preferredWidth: parent.parent.width / 5
+                Layout.preferredHeight: 50
+                text: "控制"
+                onClicked: currentPageIndex = 1
+                background: Rectangle {
+                    color: (currentPageIndex === 1) ? "#3498db" : "transparent"
+                    Rectangle {
+                        width: parent.width; height: 3; color: "#2980b9"
+                        anchors.bottom: parent.bottom
+                        visible: (currentPageIndex === 1)
+                    }
+                }
+                contentItem: Row {
+                    spacing: 4
+                    anchors.centerIn: parent
+                    Image {
+                        source: "qrc:/Joystick.png"
+                        width: 20
+                        height: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: parent.parent.text
+                        color: (currentPageIndex === 1) ? "white" : "black"
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 14
+                    }
+                }
+            }
+            Button {
+                Layout.preferredWidth: parent.parent.width / 5
+                Layout.preferredHeight: 50
+                text: "设置"
+                onClicked: currentPageIndex = 2
+                background: Rectangle {
+                    color: (currentPageIndex === 2) ? "#3498db" : "transparent"
+                    Rectangle {
+                        width: parent.width; height: 3; color: "#2980b9"
+                        anchors.bottom: parent.bottom
+                        visible: (currentPageIndex === 2)
+                    }
+                }
+                contentItem: Row {
+                    spacing: 4
+                    anchors.centerIn: parent
+                    Image {
+                        source: "qrc:/Setting.png"
+                        width: 20
+                        height: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: parent.parent.text
+                        color: (currentPageIndex === 2) ? "white" : "black"
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 14
+                    }
+                }
+            }
+            Button {
+                Layout.preferredWidth: parent.parent.width / 5
+                Layout.preferredHeight: 50
+                text: "导航"
+                onClicked: currentPageIndex = 3
+                background: Rectangle {
+                    color: (currentPageIndex === 3) ? "#3498db" : "transparent"
+                    Rectangle {
+                        width: parent.width; height: 3; color: "#2980b9"
+                        anchors.bottom: parent.bottom
+                        visible: (currentPageIndex === 3)
+                    }
+                }
+                contentItem: Row {
+                    spacing: 4
+                    anchors.centerIn: parent
+                    Image {
+                        source: "qrc:/History.png"
+                        width: 20
+                        height: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: parent.parent.text
+                        color: (currentPageIndex === 3) ? "white" : "black"
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 14
+                    }
+                }
+            }
+            Button {
+                Layout.preferredWidth: parent.parent.width / 5
+                Layout.preferredHeight: 50
+                text: "作图"
+                onClicked: currentPageIndex = 4
+                background: Rectangle {
+                    color: (currentPageIndex === 4) ? "#3498db" : "transparent"
+                    Rectangle {
+                        width: parent.width; height: 3; color: "#2980b9"
+                        anchors.bottom: parent.bottom
+                        visible: (currentPageIndex === 4)
+                    }
+                }
+                contentItem: Row {
+                    spacing: 4
+                    anchors.centerIn: parent
+                    Image {
+                        source: "qrc:/map.png"
+                        width: 20
+                        height: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: parent.parent.text
+                        color: (currentPageIndex === 4) ? "white" : "black"
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 14
+                    }
+                }
+            }
+        }
     }
+
     Popup{
             id: modePopup
 

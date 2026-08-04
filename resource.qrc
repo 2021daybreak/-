@@ -2,5 +2,10 @@
     <qresource prefix="/">
         <file>arrow.png</file>
         <file>lab_7.6.png</file>
+        <file>Robotics.png</file>
+        <file>Joystick.png</file>
+        <file>Setting.png</file>
+        <file>History.png</file>
+        <file>map.png</file>
     </qresource>
 </RCC>
