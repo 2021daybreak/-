@@ -5,6 +5,7 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts
 import MyMapTools 1.0
 import QtQuick.Dialogs
+import QtQuick.Effects
 ApplicationWindow {
     id:root
     visible: true
@@ -12,6 +13,20 @@ ApplicationWindow {
     width: 500
     height: 900
     title: "TCP 测试客户端"
+    color: "#1a1b26"
+
+    Canvas { id: gridCanvas; anchors.fill: parent; z: -1
+        onPaint: { var ctx = getContext("2d"); ctx.clearRect(0,0,width,height);
+            var cx=width/2,cy=height*0.3,mx=Math.max(width,height)*1.5;
+            ctx.strokeStyle="rgba(0,255,255,0.04)"; ctx.lineWidth=0.5;
+            var st=40,ln=Math.floor(mx/st);
+            for(var i=-ln;i<=ln;i++){ var a=Math.atan2(i*st,mx);
+                ctx.beginPath(); ctx.moveTo(cx-i*st,cy);
+                ctx.lineTo(cx+Math.cos(a)*mx,cy+Math.sin(a)*mx); ctx.stroke(); }
+            for(var j=0;j<20;j++){ var r=j*st*2+20;
+                ctx.beginPath(); ctx.ellipse(cx-r,cy-r*0.4,r*2,r*0.8); ctx.stroke(); }
+        }
+    }
     property var inputvalues:["0","0","0","0","0","0","0","0","0","0","0"]
     property var feedbackValues:["0","0","0","0","0","0","0","0","0","0","0"]
     property var inputvalues_hands:["0","0","0","0","0","0"]
@@ -32,15 +47,17 @@ ApplicationWindow {
             id: topNavBar
             width: parent.width
             height: 60 // 导航栏高度
-            color: "#e6e6fa"
+            color: "#1a1e2e"
             Text {
                 id: statusText
                 text: "未连接 (等待点击连接)"
                 font.pixelSize: 15
-                color: "black"
+                color: "#E0E0E0"
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 anchors.topMargin: 20
+                layer.enabled: true
+                layer.effect: MultiEffect { shadowColor: "#00FFFF"; shadowBlur: 1.0; shadowHorizontalOffset: 0; shadowVerticalOffset: 0 }
             }
 
         Switch{
@@ -53,14 +70,14 @@ ApplicationWindow {
                   implicitHeight: 20
                   implicitWidth: 40
                   radius:10
-                  color: servoSwitch.checked ? "#4CD964":"#555555"
+                  color: servoSwitch.checked ? "#00FFFF":"#333333"
                   Rectangle{
                   x: servoSwitch.checked ? parent.width - width-2 :2
                   y:2
                   width: 16
                   height: 16
                   radius:8
-                  color: "white"
+                  color: "#E0E0E0"
                   }
              }
 
@@ -69,12 +86,12 @@ ApplicationWindow {
                          tcpManager.sendMessage("1003:1");
                          isServoReady = true;
                          statusLabel.text="伺服已供电"
-                         statusLabel.color="green"
+                         statusLabel.color="#00FFFF"
                      } else {
                          tcpManager.sendMessage("1003:0");
                          isServoReady = false;
                          statusLabel.text="伺服已断电"
-                         statusLabel.color="red"
+                         statusLabel.color="#FF4444"
                      }
                  }
         }
@@ -84,6 +101,7 @@ ApplicationWindow {
                 y:40;
                 text:"伺服状态"
                 font.pixelSize: 14
+                color: "#E0E0E0"
         }
         Text{
                 id: statusLabel_1
@@ -93,6 +111,7 @@ ApplicationWindow {
                 anchors.topMargin: 40
                 text:"使能状态"
                 font.pixelSize: 14
+                color: "#E0E0E0"
         }
 
         Switch{
@@ -107,14 +126,14 @@ ApplicationWindow {
                      implicitHeight: 20
                      implicitWidth: 40
                      radius:10
-                     color: servoSwitch_1.checked ? "#4CD964":"#555555"
+                     color: servoSwitch_1.checked ? "#00FFFF":"#333333"
                      Rectangle{
                      x: servoSwitch_1.checked ? parent.width - width-2 :2
                      y:2
                      width: 16
                      height: 16
                      radius:8
-                     color: "white"
+                     color: "#E0E0E0"
                      }
                 }
                 onCheckedChanged: {
@@ -122,30 +141,32 @@ ApplicationWindow {
                             tcpManager.sendMessage("1004:1");
                             isServoReady_1 = true;
                             statusLabel_1.text="已使能"
-                            statusLabel_1.color="green"
+                            statusLabel_1.color="#00FFFF"
                         } else {
                             tcpManager.sendMessage("1004:0");
                             isServoReady_1 = false;
                             statusLabel_1.text="未使能"
-                            statusLabel_1.color="red"
+                            statusLabel_1.color="#FF4444"
                         }
                     }
         }
     }
 
-    StackLayout {
+    SwipeView {
+        id: swipeView
         anchors.top: topNavBar.bottom
-        anchors.bottom: bottomNavBar.top
+        anchors.bottom: pageIndicator.top
+        anchors.bottomMargin: 10
         anchors.left: parent.left
         anchors.right: parent.right
+        clip: true
+        interactive: true
 
-        // 关键：绑定到 currentPageIndex
         currentIndex: currentPageIndex
     Rectangle //主页面
     {
         id: mainPage
-        anchors.fill: parent
-        color: "#f0f0f0" // 浅灰色背景
+        color: "#1a1b26"
     Column {
         //垂直布局容器
         anchors.centerIn: parent
@@ -164,7 +185,7 @@ ApplicationWindow {
                    width: parent.width*0.5 - 5
 
                    // Axis 1
-                   Text { text: "axis 1:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_0; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -172,14 +193,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_0.acceptableInput ? "white" : "red"
+                       border.color: input_0.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_0; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_0; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    // Axis 2
-                   Text { text: "axis 2:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_1; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -187,14 +208,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_1.acceptableInput ? "white" : "red"
+                       border.color: input_1.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_1; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_1; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    // Axis 3
-                   Text { text: "axis 3:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_2; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -202,14 +223,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_2.acceptableInput ? "white" : "red"
+                       border.color: input_2.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_2; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_2; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    // Axis 4
-                   Text { text: "axis 4:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_3; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -217,14 +238,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_3.acceptableInput ? "white" : "red"
+                       border.color: input_3.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_3; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_3; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    // Axis 5
-                   Text { text: "axis 5:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_4; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -232,14 +253,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_4.acceptableInput ? "white" : "red"
+                       border.color: input_4.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_4; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_4; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    // Axis 6
-                   Text { text: "axis 6:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_5; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -247,14 +268,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_5.acceptableInput ? "white" : "red"
+                       border.color: input_5.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_5; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_5; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    // Axis 7
-                   Text { text: "axis 7:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 7:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_6; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -262,14 +283,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_6.acceptableInput ? "white" : "red"
+                       border.color: input_6.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_6; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_6; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    //axis 8
-                   Text { text: "axis 8:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 8:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_7; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -277,14 +298,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_7.acceptableInput ? "white" : "red"
+                       border.color: input_7.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                    }
                    }
-                   Text { id: feedback_7; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_7; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    //axis 9
-                   Text { text: "axis 9:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 9:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_8; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -292,14 +313,14 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_8.acceptableInput ? "white" : "red"
+                       border.color: input_8.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_8; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_8; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    //axis 10
-                   Text { text: "axis 10:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 10:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_9; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -307,14 +328,14 @@ ApplicationWindow {
                                top: 360
                        }
                        background:Rectangle{
-                       border.color: input_9.acceptableInput ? "white" : "red"
+                       border.color: input_9.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                    }
                    }
-                   Text { id: feedback_9; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_9; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                    //axis 11
-                   Text { text: "axis 11:"; verticalAlignment: Text.AlignVCenter }
+                   Text { text: "axis 11:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                    TextField {
                        id: input_10; text: "0"; width: 80;
                        validator: DoubleValidator {
@@ -322,18 +343,18 @@ ApplicationWindow {
                                top: 360
                            }
                        background:Rectangle{
-                       border.color: input_10.acceptableInput ? "white" : "red"
+                       border.color: input_10.acceptableInput ? "#333" : "#FF4444"
                        border.width: 2
                         }
                    }
-                   Text { id: feedback_10; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                   Text { id: feedback_10; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
                }
         Grid {
                 columns: 3
                 width: parent.width * 0.5 - 5
                 spacing: 10
                 // Finger 1
-                Text { text: "Finger 1:"; verticalAlignment: Text.AlignVCenter }
+                Text { text: "Finger 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                 TextField {
                     id: inputH_0; text: "0"; width: 80;
                     validator: IntValidator {
@@ -341,14 +362,14 @@ ApplicationWindow {
                             top: 100
                         }
                     background:Rectangle{
-                    border.color: inputH_0.acceptableInput ? "white" : "red"
+                    border.color: inputH_0.acceptableInput ? "#333" : "#FF4444"
                     border.width: 2
                      }
                 }
-                Text { id: feedbackH_0; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                Text { id: feedbackH_0; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                 // Finger 2
-                Text { text: "Finger 2:"; verticalAlignment: Text.AlignVCenter }
+                Text { text: "Finger 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                 TextField {
                     id: inputH_1; text: "0"; width: 80;
                     validator: IntValidator {
@@ -356,14 +377,14 @@ ApplicationWindow {
                             top: 100
                         }
                     background:Rectangle{
-                    border.color: inputH_1.acceptableInput ? "white" : "red"
+                    border.color: inputH_1.acceptableInput ? "#333" : "#FF4444"
                     border.width: 2
                      }
                 }
-                Text { id: feedbackH_1; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                Text { id: feedbackH_1; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                 // Finger 3
-                Text { text: "Finger 3:"; verticalAlignment: Text.AlignVCenter }
+                Text { text: "Finger 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                 TextField {
                     id: inputH_2; text: "0"; width: 80;
                     validator: IntValidator {
@@ -371,14 +392,14 @@ ApplicationWindow {
                             top: 100
                         }
                     background:Rectangle{
-                    border.color: inputH_2.acceptableInput ? "white" : "red"
+                    border.color: inputH_2.acceptableInput ? "#333" : "#FF4444"
                     border.width: 2
                      }
                 }
-                Text { id: feedbackH_2; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                Text { id: feedbackH_2; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                 // Finger 4
-                Text { text: "Finger 4:"; verticalAlignment: Text.AlignVCenter }
+                Text { text: "Finger 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                 TextField {
                     id: inputH_3; text: "0"; width: 80;
                     validator: IntValidator {
@@ -386,14 +407,14 @@ ApplicationWindow {
                             top: 100
                         }
                    background:Rectangle{
-                   border.color: inputH_3.acceptableInput ? "white" : "red"
+                   border.color: inputH_3.acceptableInput ? "#333" : "#FF4444"
                    border.width: 2
                     }
                 }
-                Text { id: feedbackH_3; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                Text { id: feedbackH_3; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                 // Finger 5
-                Text { text: "Finger 5:"; verticalAlignment: Text.AlignVCenter }
+                Text { text: "Finger 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                 TextField {
                     id: inputH_4; text: "0"; width: 80;
                     validator: IntValidator {
@@ -401,14 +422,14 @@ ApplicationWindow {
                             top: 100
                         }
                    background:Rectangle{
-                   border.color: inputH_4.acceptableInput ? "white" : "red"
+                   border.color: inputH_4.acceptableInput ? "#333" : "#FF4444"
                    border.width: 2
                     }
                 }
-                Text { id: feedbackH_4; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                Text { id: feedbackH_4; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
 
                 // Finger 6
-                Text { text: "Finger 6:"; verticalAlignment: Text.AlignVCenter }
+                Text { text: "Finger 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                 TextField {
                     id: inputH_5; text: "0"; width: 80;
                     validator: IntValidator {
@@ -416,11 +437,11 @@ ApplicationWindow {
                             top: 100
                         }
                    background:Rectangle{
-                   border.color: inputH_5.acceptableInput ? "white" : "red"
+                   border.color: inputH_5.acceptableInput ? "#333" : "#FF4444"
                    border.width: 2
                     }
                 }
-                Text { id: feedbackH_5; text: "0"; verticalAlignment: Text.AlignVCenter; color: "blue" }
+                Text { id: feedbackH_5; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
         }
 }
         Text{
@@ -579,8 +600,7 @@ ApplicationWindow {
     }
     Rectangle {
         id: runPage
-        anchors.fill: parent
-        color: "#f0f0f0" // 浅灰色背景
+        color: "#1a1b26"
     Item {
         id: container
         anchors.left: parent.left
@@ -677,7 +697,7 @@ ApplicationWindow {
                        Rectangle{
                        id:body_gamepad
                        anchors.fill: parent
-                       color:"#f0f0f0"
+                       color:"#1a1b26"
                        }
                        Item{
                                       id: joystickComponent
@@ -694,8 +714,8 @@ ApplicationWindow {
                        width: 100
                        height: 100
                        radius: 50
-                       color: "#FFFAFA"
-                       border.color: "#555"
+                       color: "#2a2a3a"
+                       border.color: "#00FFFF"
                        border.width: 2
                        }
                        Rectangle {
@@ -703,7 +723,7 @@ ApplicationWindow {
                                    width: 50
                                    height: 50
                                    radius: 25
-                                   color: "#00BFFF"
+                                   color: "#00FFFF"
                                    x: stickBase.x + 25
                                    y: stickBase.y + 25
                                    MouseArea {
@@ -731,8 +751,7 @@ ApplicationWindow {
     }
     Rectangle{
         id:settings
-        anchors.fill: parent
-        color: "#f0f0f0"
+        color: "#1a1b26"
         Item{
              anchors.fill:parent
              Button{
@@ -764,7 +783,7 @@ ApplicationWindow {
                   Text{
                   text: "服务器设置"
                   font.pixelSize: 16
-                  color:"black"
+                  color:"#E0E0E0"
                   }
                   Row{
                    width: parent.width
@@ -812,8 +831,7 @@ ApplicationWindow {
         }
     Rectangle{
                    id: imagePage
-                   color: "#E0E0E0"
-                   anchors.fill: parent
+                   color: "#1a1b26"
                    property real currentAngle: 0
                    property bool updatingQz: false
                    property bool updatingQw: false
@@ -881,7 +899,7 @@ ApplicationWindow {
                            // X 输入框
                            Row {
                                spacing: 5
-                               Text { text: "X:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               Text { text: "X:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                                TextField {
                                    id: inputX; text: "0"; width: 130
                                    validator: DoubleValidator {
@@ -901,7 +919,7 @@ ApplicationWindow {
                            // Y 输入框
                            Row {
                                spacing: 5
-                               Text { text: "Y:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               Text { text: "Y:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                                TextField {
                                    id: inputY; text: "0"; width: 130
                                    validator: DoubleValidator {
@@ -921,7 +939,7 @@ ApplicationWindow {
                            // qz 输入框
                            Row {
                                spacing: 5
-                               Text { text: "qz:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               Text { text: "qz:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                                TextField {
                                    id: inputQz; text: "0"; width: 130
                                    validator: DoubleValidator {
@@ -950,7 +968,7 @@ ApplicationWindow {
                            // qw 输入框
                            Row {
                                spacing: 5
-                               Text { text: "qw:"; width: 30; verticalAlignment: Text.AlignVCenter }
+                               Text { text: "qw:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
                                TextField {
                                    id: inputQw; text: "1"; width: 130
                                    validator: DoubleValidator {
@@ -1162,8 +1180,7 @@ ApplicationWindow {
     }
     Rectangle{
                    id: page5
-                   color: "#E0E0E0"
-                   anchors.fill: parent
+                   color: "#1a1b26"
                    property string loadedImagePath: ""
                    property string penColor: "black"
                    Button{
@@ -1262,7 +1279,7 @@ ApplicationWindow {
                                       anchors.rightMargin: 30
                                       text: "横坐标X: " + mouseArea.currentWorldX + "横坐标Y: " + mouseArea.currentWorldY
                                       font.pixelSize: 16
-                                      color:"black"
+                                      color:"#E0E0E0"
                                       z:10
                              }
                             Button {
@@ -1330,169 +1347,218 @@ ApplicationWindow {
                    }
     }
 
+    // ---- Page Indicator ----
+    Row {
+        id: pageIndicator
+        anchors.bottom: bottomNavBar.top
+        anchors.bottomMargin: 12
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 8
+        Repeater {
+            model: 5
+            Rectangle {
+                width: swipeView.currentIndex === index ? 16 : 8
+                height: 8
+                radius: 4
+                color: swipeView.currentIndex === index ? "#00FFFF" : "#40FFFFFF"
+                Behavior on width { NumberAnimation { duration: 200 } }
+                Behavior on color { ColorAnimation { duration: 200 } }
+            }
+        }
+    }
+
+    // ---- Floating Capsule Bottom Nav ----
     Rectangle {
         id: bottomNavBar
         anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 60
-        color: "#87cefa"
+        anchors.bottomMargin: 20
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: parent.width - 32
+        height: 64
+        radius: 32
+        color: "#D91E1E1E"
+        border.color: "#00FFFF"
+        border.width: 1
+        clip: true
+        layer.enabled: true
+        layer.effect: MultiEffect { shadowColor: "#00FFFF"; shadowBlur: 1.0; shadowHorizontalOffset: 0; shadowVerticalOffset: 0 }
         RowLayout {
-            anchors.centerIn: parent
+            anchors.fill: parent
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
             spacing: 0
             Button {
-                Layout.preferredWidth: parent.parent.width / 5
+                Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 text: "指令"
-                onClicked: currentPageIndex = 0
+                onClicked: { currentPageIndex = 0; swipeView.currentIndex = 0 }
                 background: Rectangle {
-                    color: (currentPageIndex === 0) ? "#3498db" : "transparent"
-                    Rectangle {
-                        width: parent.width; height: 3; color: "#2980b9"
-                        anchors.bottom: parent.bottom
-                        visible: (currentPageIndex === 0)
-                    }
+                    radius: 12
+                    color: (currentPageIndex === 0) ? "#1A00FFFF" : "transparent"
+                    Behavior on color { ColorAnimation { duration: 250 } }
                 }
-                contentItem: Row {
-                    spacing: 4
+                contentItem: Column {
+                    spacing: 2
                     anchors.centerIn: parent
                     Image {
-                        source: "qrc:/Robotics.png"
-                        width: 20
-                        height: 20
-                        anchors.verticalCenter: parent.verticalCenter
+                        id: icon0
+                        source: "qrc:/Robotics_1.png"
+                        width: 24; height: 24
+                        fillMode: Image.PreserveAspectFit
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    MultiEffect {
+                        anchors.fill: icon0
+                        source: icon0
+                        colorizationColor: (currentPageIndex === 0) ? "#00FFFF" : "#666666"
+                        colorization: 1.0
                     }
                     Text {
                         text: parent.parent.text
-                        color: (currentPageIndex === 0) ? "white" : "black"
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 14
+                        color: (currentPageIndex === 0) ? "#00FFFF" : "#888888"
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 11
                     }
                 }
             }
             Button {
-                Layout.preferredWidth: parent.parent.width / 5
+                Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 text: "控制"
-                onClicked: currentPageIndex = 1
+                onClicked: { currentPageIndex = 1; swipeView.currentIndex = 1 }
                 background: Rectangle {
-                    color: (currentPageIndex === 1) ? "#3498db" : "transparent"
-                    Rectangle {
-                        width: parent.width; height: 3; color: "#2980b9"
-                        anchors.bottom: parent.bottom
-                        visible: (currentPageIndex === 1)
-                    }
+                    radius: 12
+                    color: (currentPageIndex === 1) ? "#1A00FFFF" : "transparent"
+                    Behavior on color { ColorAnimation { duration: 250 } }
                 }
-                contentItem: Row {
-                    spacing: 4
+                contentItem: Column {
+                    spacing: 2
                     anchors.centerIn: parent
                     Image {
-                        source: "qrc:/Joystick.png"
-                        width: 20
-                        height: 20
-                        anchors.verticalCenter: parent.verticalCenter
+                        id: icon1
+                        source: "qrc:/Joystick_1.png"
+                        width: 24; height: 24
+                        fillMode: Image.PreserveAspectFit
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    MultiEffect {
+                        anchors.fill: icon1
+                        source: icon1
+                        colorizationColor: (currentPageIndex === 1) ? "#00FFFF" : "#666666"
+                        colorization: 1.0
                     }
                     Text {
                         text: parent.parent.text
-                        color: (currentPageIndex === 1) ? "white" : "black"
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 14
+                        color: (currentPageIndex === 1) ? "#00FFFF" : "#888888"
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 11
                     }
                 }
             }
             Button {
-                Layout.preferredWidth: parent.parent.width / 5
+                Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 text: "设置"
-                onClicked: currentPageIndex = 2
+                onClicked: { currentPageIndex = 2; swipeView.currentIndex = 2 }
                 background: Rectangle {
-                    color: (currentPageIndex === 2) ? "#3498db" : "transparent"
-                    Rectangle {
-                        width: parent.width; height: 3; color: "#2980b9"
-                        anchors.bottom: parent.bottom
-                        visible: (currentPageIndex === 2)
-                    }
+                    radius: 12
+                    color: (currentPageIndex === 2) ? "#1A00FFFF" : "transparent"
+                    Behavior on color { ColorAnimation { duration: 250 } }
                 }
-                contentItem: Row {
-                    spacing: 4
+                contentItem: Column {
+                    spacing: 2
                     anchors.centerIn: parent
                     Image {
-                        source: "qrc:/Setting.png"
-                        width: 20
-                        height: 20
-                        anchors.verticalCenter: parent.verticalCenter
+                        id: icon2
+                        source: "qrc:/setting_1.png"
+                        width: 24; height: 24
+                        fillMode: Image.PreserveAspectFit
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    MultiEffect {
+                        anchors.fill: icon2
+                        source: icon2
+                        colorizationColor: (currentPageIndex === 2) ? "#00FFFF" : "#666666"
+                        colorization: 1.0
                     }
                     Text {
                         text: parent.parent.text
-                        color: (currentPageIndex === 2) ? "white" : "black"
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 14
+                        color: (currentPageIndex === 2) ? "#00FFFF" : "#888888"
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 11
                     }
                 }
             }
             Button {
-                Layout.preferredWidth: parent.parent.width / 5
+                Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 text: "导航"
-                onClicked: currentPageIndex = 3
+                onClicked: { currentPageIndex = 3; swipeView.currentIndex = 3 }
                 background: Rectangle {
-                    color: (currentPageIndex === 3) ? "#3498db" : "transparent"
-                    Rectangle {
-                        width: parent.width; height: 3; color: "#2980b9"
-                        anchors.bottom: parent.bottom
-                        visible: (currentPageIndex === 3)
-                    }
+                    radius: 12
+                    color: (currentPageIndex === 3) ? "#1A00FFFF" : "transparent"
+                    Behavior on color { ColorAnimation { duration: 250 } }
                 }
-                contentItem: Row {
-                    spacing: 4
+                contentItem: Column {
+                    spacing: 2
                     anchors.centerIn: parent
                     Image {
+                        id: icon3
                         source: "qrc:/History.png"
-                        width: 20
-                        height: 20
-                        anchors.verticalCenter: parent.verticalCenter
+                        width: 24; height: 24
+                        fillMode: Image.PreserveAspectFit
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    MultiEffect {
+                        anchors.fill: icon3
+                        source: icon3
+                        colorizationColor: (currentPageIndex === 3) ? "#00FFFF" : "#666666"
+                        colorization: 1.0
                     }
                     Text {
                         text: parent.parent.text
-                        color: (currentPageIndex === 3) ? "white" : "black"
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 14
+                        color: (currentPageIndex === 3) ? "#00FFFF" : "#888888"
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 11
                     }
                 }
             }
             Button {
-                Layout.preferredWidth: parent.parent.width / 5
+                Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 text: "作图"
-                onClicked: currentPageIndex = 4
+                onClicked: { currentPageIndex = 4; swipeView.currentIndex = 4 }
                 background: Rectangle {
-                    color: (currentPageIndex === 4) ? "#3498db" : "transparent"
-                    Rectangle {
-                        width: parent.width; height: 3; color: "#2980b9"
-                        anchors.bottom: parent.bottom
-                        visible: (currentPageIndex === 4)
-                    }
+                    radius: 12
+                    color: (currentPageIndex === 4) ? "#1A00FFFF" : "transparent"
+                    Behavior on color { ColorAnimation { duration: 250 } }
                 }
-                contentItem: Row {
-                    spacing: 4
+                contentItem: Column {
+                    spacing: 2
                     anchors.centerIn: parent
                     Image {
-                        source: "qrc:/map.png"
-                        width: 20
-                        height: 20
-                        anchors.verticalCenter: parent.verticalCenter
+                        id: icon4
+                        source: "qrc:/map_1.png"
+                        width: 24; height: 24
+                        fillMode: Image.PreserveAspectFit
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    MultiEffect {
+                        anchors.fill: icon4
+                        source: icon4
+                        colorizationColor: (currentPageIndex === 4) ? "#00FFFF" : "#666666"
+                        colorization: 1.0
                     }
                     Text {
                         text: parent.parent.text
-                        color: (currentPageIndex === 4) ? "white" : "black"
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 14
+                        color: (currentPageIndex === 4) ? "#00FFFF" : "#888888"
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 11
                     }
                 }
             }
         }
     }
-
     Popup{
             id: modePopup
 
@@ -1506,8 +1572,8 @@ ApplicationWindow {
             Rectangle {
                 width: 170
                 height: 190
-                color: "#E0E0E0"
-                border.color: "#534646ff"
+                color: "#1a1e2e"
+                border.color: "#00FFFF"
                 radius: 5
                 Column {
                     anchors.fill: parent
