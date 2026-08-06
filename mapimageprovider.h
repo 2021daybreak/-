@@ -5,6 +5,8 @@
 #include <QImage>
 #include <QString>
 #include <QColor>
+#include <QList>
+#include <QPointF>
 class MapImageProvider :public QQuickImageProvider
 {
     Q_OBJECT
@@ -19,13 +21,25 @@ public:
 public slots:
     bool loadFromPng(const QString &path);
     bool saveAsPng(const QString &path);
-    void drawLine(int x1, int y1, int x2, int y2, int width = 2, const QColor &color = Qt::black);
+    void addWallPoint(qreal x, qreal y);
+    void finishCurrentWall();
+    void clearCurrentWall();
+    void selectWall(int index);
+    void deselectWall();
+    void deleteWall(int index);
+    void clearAllWalls();
     void clearMap();
 signals:
     void imageChanged();
+    void wallsChanged();
 private:
-    QImage m_image;       // 存储图片数据
-    QString m_currentPath; // 存储当前文件路径
+    QImage m_image;                  // 存储图片数据
+    QString m_currentPath;           // 存储当前文件路径
+
+    QList<QPointF> m_currentWallPoints;
+    QList<QList<QPointF>> m_virtualWalls;
+    int m_selectedWallIndex = -1;
+    void drawWallsOnImage(QImage &img);
 };
 
 #endif // MAPIMAGEPROVIDER_H

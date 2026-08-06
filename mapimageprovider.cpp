@@ -10,10 +10,12 @@ QImage MapImageProvider::requestImage(const QString &id, QSize *size, const QSiz
 {
     Q_UNUSED(id)
     Q_UNUSED(requestedSize)
+    QImage result = m_image.copy();
+    drawWallsOnImage(result);
     if (size) {
-        *size = m_image.size();
+        *size = result.size();
     }
-    return m_image;
+    return result;
 }
 
 void MapImageProvider::createBlankMap(int width, int height)
@@ -58,23 +60,90 @@ bool MapImageProvider::saveAsPng(const QString &path)
     }
     return result;
 }
-void MapImageProvider::drawLine(int x1, int y1,int x2,int y2,int width, const QColor &color)
+void MapImageProvider::addWallPoint(qreal x, qreal y)
 {
-    if (m_image.isNull()) {
-        createBlankMap(349, 259); // 如果还没初始化，先创建白纸
+    m_currentWallPoints.append(QPointF(x, y));
+    emit imageChanged();
+    emit wallsChanged();
+}
+void MapImageProvider::finishCurrentWall()
+{
+    if (m_currentWallPoints.size() >= 2) {
+        m_virtualWalls.append(m_currentWallPoints);
+        m_currentWallPoints.clear();
+        emit imageChanged();
+        emit wallsChanged();
     }
-
-QPainter painter(&m_image);
-painter.setRenderHint(QPainter::Antialiasing);  // 这个仍然要保留！
-painter.setPen(QPen(QColor(color), width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-painter.drawLine(x1,y1,x2,y2);
-painter.end();
-
-emit imageChanged();
+}
+void MapImageProvider::clearCurrentWall()
+{
+    if (!m_currentWallPoints.isEmpty()) {
+        m_currentWallPoints.clear();
+        emit imageChanged();
+        emit wallsChanged();
+    }
+}
+void MapImageProvider::selectWall(int index)
+{
+    if (index >= 0 && index < m_virtualWalls.size()) {
+        m_selectedWallIndex = index;
+        emit imageChanged();
+        emit wallsChanged();
+    }
+}
+void MapImageProvider::deselectWall()
+{
+    if (m_selectedWallIndex != -1) {
+        m_selectedWallIndex = -1;
+        emit imageChanged();
+        emit wallsChanged();
+    }
+}
+void MapImageProvider::deleteWall(int index)
+{
+    if (index >= 0 && index < m_virtualWalls.size()) {
+        m_virtualWalls.removeAt(index);
+        if (m_selectedWallIndex == index) m_selectedWallIndex = -1;
+        else if (m_selectedWallIndex > index) m_selectedWallIndex--;
+        emit imageChanged();
+        emit wallsChanged();
+    }
+}
+void MapImageProvider::clearAllWalls()
+{
+    m_currentWallPoints.clear();
+    m_virtualWalls.clear();
+    m_selectedWallIndex = -1;
+    emit imageChanged();
+    emit wallsChanged();
 }
 void MapImageProvider::clearMap()
 {
     // 清空时保持原有尺寸
     createBlankMap(m_image.width(), m_image.height());
+    clearAllWalls();
     emit imageChanged();
+}
+
+void MapImageProvider::drawWallsOnImage(QImage &img)
+{
+    QPainter painter(&img);
+    painter.setRenderHint(QPainter::Antialiasing);
+    for (int i = 0; i < m_virtualWalls.size(); i++) {
+        const QList<QPointF> &wall = m_virtualWalls[i];
+        if (wall.size() < 2) continue;
+        bool sel = (i == m_selectedWallIndex);
+        painter.setPen(QPen(sel ? QColor("#00FFFF") : Qt::black, sel ? 4 : 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        for (int j = 0; j < wall.size() - 1; j++) painter.drawLine(wall[j], wall[j + 1]);
+    }
+    if (m_currentWallPoints.size() >= 2) {
+        painter.setPen(QPen(QColor("#888888"), 2, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin));
+        for (int i = 0; i < m_currentWallPoints.size() - 1; i++) painter.drawLine(m_currentWallPoints[i], m_currentWallPoints[i + 1]);
+    }
+    if (!m_currentWallPoints.isEmpty()) {
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor("#00FFFF"));
+        for (const QPointF &pt : m_currentWallPoints) painter.drawEllipse(pt, 3, 3);
+    }
+    painter.end();
 }

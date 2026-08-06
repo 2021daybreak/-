@@ -1178,173 +1178,120 @@ ApplicationWindow {
                        }
                    }
     }
-    Rectangle{
-                   id: page5
-                   color: "#1a1b26"
-                   property string loadedImagePath: ""
-                   property string penColor: "black"
-                   Button{
-                   id:loadbtn_1
-                   text: "加载图片"
-                   anchors.top:parent.top
-                   anchors.horizontalCenter: parent.horizontalCenter
-                   anchors.topMargin: 20
-                   onClicked: {
-                            page5FileDialog.open()
-                   }
-                   }
-                   Image{
-                            id:imageItem_1
-                            anchors.top: loadbtn_1.bottom
-                            anchors.bottom: parent.bottom
-                            anchors.left: parent.left
-                            anchors.right:parent.right
-                            anchors.margins: 30
-                            fillMode: Image.PreserveAspectFit
+    Rectangle {
+        id: page5
+        color: "#1a1b26"
+        property string loadedImagePath: ""
+        property var currentPoints: []
+        property int wallCount: 0
 
-                            // 坐标转换函数：将鼠标坐标转换为图片像素坐标
-                            function mouseToPixel(mouseX, mouseY) {
-                                // 计算图片显示区域的偏移（留白）
-                                var offsetX = (imageItem_1.width - imageItem_1.paintedWidth) / 2
-                                var offsetY = (imageItem_1.height - imageItem_1.paintedHeight) / 2
+        // ---- Top toolbar ----
+        Row {
+            id: wallToolbar
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 8
+            Button {
+                text: "加载图片"
+                onClicked: page5FileDialog.open()
+            }
+            Button {
+                text: "完成墙体"
+                enabled: page5.currentPoints.length >= 2
+                onClicked: {
+                    mapProvider.finishCurrentWall()
+                    page5.currentPoints = []
+                    page5.wallCount = page5.wallCount + 1
+                    page5.refreshImage()
+                }
+            }
+            Button {
+                text: "撤销"
+                enabled: page5.currentPoints.length > 0
+                onClicked: {
+                    mapProvider.clearCurrentWall()
+                    page5.currentPoints = []
+                    page5.refreshImage()
+                }
+            }
+            Button {
+                text: "清空全部"
+                onClicked: {
+                    mapProvider.clearAllWalls()
+                    page5.currentPoints = []
+                    page5.wallCount = 0
+                    page5.refreshImage()
+                }
+            }
+        }
 
-                                // 计算缩放因子
-                                var scale = imageItem_1.sourceSize.width / imageItem_1.paintedWidth
-                                if (scale <= 0) scale = 1
+        // ---- Image area ----
+        Image {
+            id: imageItem_1
+            anchors.top: wallToolbar.bottom
+            anchors.bottom: infoBar.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 10
+            fillMode: Image.PreserveAspectFit
 
-                                // 转换为图片像素坐标
-                                var pixelX = (mouseX - offsetX) * scale
-                                var pixelY = (mouseY - offsetY) * scale
+            function mouseToPixel(mouseX, mouseY) {
+                var offsetX = (imageItem_1.width - imageItem_1.paintedWidth) / 2
+                var offsetY = (imageItem_1.height - imageItem_1.paintedHeight) / 2
+                var scale = imageItem_1.sourceSize.width / imageItem_1.paintedWidth
+                if (scale <= 0) scale = 1
+                return { x: (mouseX - offsetX) * scale, y: (mouseY - offsetY) * scale }
+            }
 
-                                return { x: pixelX, y: pixelY }
-                            }
-                            function pixelToWorld(pixelX, pixelY) {
-                                // X 轴转换
-                                var worldX = mapOriginX + (pixelX * mapResolution);
+            MouseArea {
+                anchors.fill: parent
+                enabled: imageItem_1.source !== ""
+                onClicked: function(mouse) {
+                    var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
+                    mapProvider.addWallPoint(pos.x, pos.y)
+                    page5.currentPoints = page5.currentPoints.concat([{x: pos.x, y: pos.y}])
+                    page5.refreshImage()
+                }
+            }
+        }
 
-                                // Y 轴转换 (注意：图片Y轴向下，地图Y轴向上，需要翻转)
-                                // imageItem_1.sourceSize.height 是图片原始高度
-                                var worldY = mapOriginY + ((imageItem_1.sourceSize.height - pixelY) * mapResolution);
+        // ---- Info bar ----
+        Rectangle {
+            id: infoBar
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 36
+            color: "#1a1e2e"
+            Text {
+                anchors.centerIn: parent
+                text: "当前墙点数: " + page5.currentPoints.length + "  |  已完成墙体: " + page5.wallCount
+                color: "#E0E0E0"
+                font.pixelSize: 13
+            }
+        }
 
-                                return { x: worldX, y: worldY };
-                            }
-                            MouseArea {
-                                        id: mouseArea
-                                        anchors.fill: parent
-                                        enabled: imageItem_1.source !== ""
+        function refreshImage() {
+            imageItem_1.source = ""
+            imageItem_1.source = "image://mapProvider?" + Math.random()
+        }
 
-                                        property real startX: 0
-                                        property real startY: 0
-                                        property bool isDrawing: false
-                                        property real currentWorldX: 0
-                                        property real currentWorldY: 0
-                                        onPressed: function(mouse) {
-                                            var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
-                                            startX = pos.x
-                                            startY = pos.y
-                                            isDrawing = true
-                                        }
-
-                                        onPositionChanged: function(mouse) {
-                                            if (isDrawing) {
-                                                var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
-                                                var worldPos = imageItem_1.pixelToWorld(pos.x, pos.y);
-                                                currentWorldX = Number(worldPos.x.toFixed(2));
-                                                currentWorldY = Number(worldPos.y.toFixed(2));
-                                                mapProvider.drawLine(
-                                                    startX, startY,
-                                                    pos.x, pos.y,
-                                                    2,
-                                                    page5.penColor
-                                                )
-                                                startX = pos.x
-                                                startY = pos.y
-                                                imageItem_1.source = ""
-                                                imageItem_1.source = "image://mapProvider?" + Math.random()
-                                            }
-                                        }
-
-                                        onReleased: function(mouse) {
-                                            isDrawing = false
-                                        }
-                   }
-
-                            }
-
-                   Text{
-                                      id:coordiateText
-                                      anchors.right:parent.right
-                                      anchors.top: parent.top
-                                      anchors.topMargin: 30
-                                      anchors.rightMargin: 30
-                                      text: "横坐标X: " + mouseArea.currentWorldX + "横坐标Y: " + mouseArea.currentWorldY
-                                      font.pixelSize: 16
-                                      color:"#E0E0E0"
-                                      z:10
-                             }
-                            Button {
-                                text: "清空画布"
-                                id:loadbtn_2
-                                anchors.top: loadbtn_1.bottom
-                                anchors.leftMargin: 20
-                                anchors.topMargin: 20
-                                onClicked: {
-                                    if (page5.loadedImagePath !== "") {
-                                        mapProvider.loadFromPng(page5.loadedImagePath)
-                                        imageItem_1.source = ""
-                                        imageItem_1.source = "image://mapProvider"
-                                    }
-                                }
-                            }
-                            Button{
-                                text:"保存画布"
-                                id:loadbtn_3
-                                anchors.top:loadbtn_2.bottom
-                                anchors.leftMargin: 20
-                                anchors.topMargin:20
-                                onClicked: saveDialog.open()
-                            }
-                            Button{
-                                text:"灰色画笔"
-                                id:loadbtn_4
-                                anchors.top:loadbtn_3.bottom
-                                anchors.leftMargin: 20
-                                anchors.topMargin:20
-                                onClicked: {
-                                    page5.penColor = "#BFBFBF"
-                                }
-                            }
-                            Button{
-                                text:"黑色画笔"
-                                id:loadbtn_5
-                                anchors.top:loadbtn_4.bottom
-                                anchors.leftMargin: 20
-                                anchors.topMargin:20
-                                onClicked: {
-                                    page5.penColor = "black"
-                                }
-                            }
-
-                            // 第5页面的文件选择对话框
-                            FileDialog {
-                                id: page5FileDialog
-                                title: "选择图片"
-                                nameFilters: [
-                                    "PNG 图片 (*.png)",
-                                    "所有文件 (*)"
-                                ]
-                                onAccepted: {
-                                var filePath = page5FileDialog.selectedFile.toString()
-                                if (filePath.startsWith("file:///")) {
-                                    filePath = filePath.substring(8)
-                                }
-                                page5.loadedImagePath = filePath
-                                mapProvider.loadFromPng(filePath)
-                                imageItem_1.source = ""
-                                imageItem_1.source = "image://mapProvider"
-                                }
-                            }
-                   }
+        FileDialog {
+            id: page5FileDialog
+            title: "选择图片"
+            nameFilters: ["PNG 图片 (*.png)", "所有文件 (*)"]
+            onAccepted: {
+                var filePath = page5FileDialog.selectedFile.toString()
+                if (filePath.startsWith("file:///")) {
+                    filePath = filePath.substring(8)
+                }
+                page5.loadedImagePath = filePath
+                mapProvider.loadFromPng(filePath)
+                page5.refreshImage()
+            }
+        }
+    }
     }
 
     // ---- Page Indicator ----
