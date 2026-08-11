@@ -835,6 +835,14 @@ ApplicationWindow {
                    property real currentAngle: 0
                    property bool updatingQz: false
                    property bool updatingQw: false
+                   property string activeMode: ""        // "" = 隐藏, "handing" = 手绘航点, "math" = 录制航点, "points" = 航点列表
+                   property real pendingWorldX: 0
+                   property real pendingWorldY: 0
+                   property real pendingQz: 0
+                   property real pendingQw: 0
+                   property bool hasPendingPoint: false
+                   property int selectedSavedIndex: -1
+                   property ListModel savedPoints: ListModel {}
                    function checkAndUpdateMarker() {
                        if (!inputX.acceptableInput || !inputY.acceptableInput ||
                            !inputQz.acceptableInput || !inputQw.acceptableInput) {
@@ -878,8 +886,8 @@ ApplicationWindow {
                        targetPos = Qt.point(0, 0)
                    }
 
-                   // 外层 RowLayout：左边输入框，右边地图
-                   RowLayout {
+                   // 外层布局：地图全屏 + 左侧面板浮动叠加
+                   Item {
                        anchors.top: parent.top
                        anchors.left: parent.left
                        anchors.right: parent.right
@@ -888,277 +896,550 @@ ApplicationWindow {
                        anchors.leftMargin: 10
                        anchors.rightMargin: 10
                        anchors.bottomMargin: 10
-                       spacing: 10
 
-                       // 左边：输入框区域（垂直排列）
-                       ColumnLayout {
-                           id: inputArea
-                           spacing: 10
-                           Layout.preferredWidth: 180
+                        // ========== 左侧浮动控制区（参照 page5） ==========
+                        Rectangle {
+                                id: leftControl
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: imagePage.activeMode === "" ? 52 : 180
+                                color: "#1a1e2e"
+                                radius: 10
+                                border.color: "#2a2a3a"
+                                border.width: 1
+                                z: 100
 
-                           // X 输入框
-                           Row {
-                               spacing: 5
-                               Text { text: "X:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                               TextField {
-                                   id: inputX; text: "0"; width: 130
-                                   validator: DoubleValidator {
-                                       bottom: -3.8
-                                       top: 13.6
+                                Behavior on width {
+                                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                                }
+
+                                ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 4
+                                        spacing: 6
+
+                                // ---- 图标按钮（垂直单列，参照 page5） ----
+                                Button {
+                                        Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                                        Layout.alignment: Qt.AlignHCenter
+                                        background: Rectangle {
+                                            radius: 8; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"
+                                            border.color: "#00FFFF"; border.width: 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Image {
+                                            source: "qrc:/Mapchoose.png"; width: 24; height: 24
+                                            fillMode: Image.PreserveAspectFit; anchors.centerIn: parent
+                                        }
+                                        onClicked: openFileDialog.open()
+                                }
+                                Button {
+                                        Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                                        Layout.alignment: Qt.AlignHCenter
+                                        background: Rectangle {
+                                            radius: 8; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"
+                                            border.color: "#00FFFF"; border.width: 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Image {
+                                            source: "qrc:/server.png"; width: 24; height: 24
+                                            fillMode: Image.PreserveAspectFit; anchors.centerIn: parent
+                                        }
+                                        onClicked: sshManager.startDownload()
+                                }
+                                Button {
+                                        Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                                        Layout.alignment: Qt.AlignHCenter
+                                        background: Rectangle {
+                                            radius: 8
+                                            color: imagePage.activeMode === "points" ? "#1A00FFFF" : (parent.hovered ? "#2a2a3a" : "#1a1e2e")
+                                            border.color: imagePage.activeMode === "points" ? "#00FFFF" : "#2a2a3a"
+                                            border.width: imagePage.activeMode === "points" ? 2 : 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Image {
+                                            source: "qrc:/navigator.png"; width: 24; height: 24
+                                            fillMode: Image.PreserveAspectFit; anchors.centerIn: parent
+                                        }
+                                        onClicked: { imagePage.activeMode = imagePage.activeMode === "points" ? "" : "points" }
+                                }
+                                Button {
+                                        Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                                        Layout.alignment: Qt.AlignHCenter
+                                        background: Rectangle {
+                                            radius: 8
+                                            color: imagePage.activeMode === "handing" ? "#1A00FFFF" : (parent.hovered ? "#2a2a3a" : "#1a1e2e")
+                                            border.color: imagePage.activeMode === "handing" ? "#00FFFF" : "#2a2a3a"
+                                            border.width: imagePage.activeMode === "handing" ? 2 : 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Image {
+                                            source: "qrc:/Handing.png"; width: 24; height: 24
+                                            fillMode: Image.PreserveAspectFit; anchors.centerIn: parent
+                                        }
+                                        onClicked: { imagePage.activeMode = imagePage.activeMode === "handing" ? "" : "handing" }
+                                }
+                                Button {
+                                        Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                                        Layout.alignment: Qt.AlignHCenter
+                                        background: Rectangle {
+                                            radius: 8
+                                            color: imagePage.activeMode === "math" ? "#1A00FFFF" : (parent.hovered ? "#2a2a3a" : "#1a1e2e")
+                                            border.color: imagePage.activeMode === "math" ? "#00FFFF" : "#2a2a3a"
+                                            border.width: imagePage.activeMode === "math" ? 2 : 1
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                        }
+                                        contentItem: Image {
+                                            source: "qrc:/Math.png"; width: 24; height: 24
+                                            fillMode: Image.PreserveAspectFit; anchors.centerIn: parent
+                                        }
+                                        onClicked: { imagePage.activeMode = imagePage.activeMode === "math" ? "" : "math" }
+                                }
+                                
+                                // ========== 手绘航点面板 ==========
+                                ColumnLayout {
+                                        visible: imagePage.activeMode === "handing"
+                                        spacing: 6
+                                        Layout.fillWidth: true
+                                        
+                                        Text {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            text: "手绘航点"; color: "#00FFFF"; font.pixelSize: 14; font.bold: true
+                                        }
+                                        Rectangle { width: parent.width; height: 1; color: "#2a2a3a" }
+                                        
+                                        // 实时坐标显示
+                                        Column {
+                                                spacing: 4
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                Text { text: "World X: " + (imagePage.hasPendingPoint ? imagePage.pendingWorldX.toFixed(3) : "--"); color: "#E0E0E0"; font.pixelSize: 11 }
+                                                Text { text: "World Y: " + (imagePage.hasPendingPoint ? imagePage.pendingWorldY.toFixed(3) : "--"); color: "#E0E0E0"; font.pixelSize: 11 }
+                                                Text { text: "qz: " + (imagePage.hasPendingPoint ? imagePage.pendingQz.toFixed(4) : "--"); color: "#E0E0E0"; font.pixelSize: 11 }
+                                                Text { text: "qw: " + (imagePage.hasPendingPoint ? imagePage.pendingQw.toFixed(4) : "--"); color: "#E0E0E0"; font.pixelSize: 11 }
+                                        }
+                                        
+                                        // 保存并上传按钮
+                                        Button {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: "保存并上传"
+                                                enabled: imagePage.hasPendingPoint
+                                                background: Rectangle {
+                                                    radius: 6; color: parent.enabled ? (parent.hovered ? "#2a2a3a" : "#1a1e2e") : "#151720"
+                                                    border.color: parent.enabled ? "#00FFFF" : "#333333"; border.width: 1
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                }
+                                                contentItem: Text {
+                                                    text: parent.text; color: parent.enabled ? "#E0E0E0" : "#555555"; font.pixelSize: 12
+                                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                                }
+                                                onClicked: {
+                                                    if (!root.checkServoReady()) return;
+                                                    if (!imagePage.hasPendingPoint) return;
+                                                    var msg = "1007:" + imagePage.pendingWorldX.toFixed(3) + "," +
+                                                              imagePage.pendingWorldY.toFixed(3) + "," +
+                                                              imagePage.pendingQz.toFixed(4) + "," +
+                                                              imagePage.pendingQw.toFixed(4);
+                                                    tcpManager.sendMessage(msg);
+                                                    // 计算显示坐标并持久化到列表
+                                                    var ppx = (imagePage.pendingWorldX - mapOriginX) / mapResolution;
+                                                    var ppy = imageItem.sourceSize.height - (imagePage.pendingWorldY - mapOriginY) / mapResolution;
+                                                    var psf = imageItem.paintedWidth / imageItem.sourceSize.width;
+                                                    var ppdX = (imageItem.width - imageItem.paintedWidth) / 2;
+                                                    var ppdY = (imageItem.height - imageItem.paintedHeight) / 2;
+                                                    var dspX = ppdX + ppx * psf;
+                                                    var dspY = ppdY + ppy * psf;
+                                                    imagePage.savedPoints.append({
+                                                        name: "点" + (imagePage.savedPoints.count + 1),
+                                                        worldX: imagePage.pendingWorldX,
+                                                        worldY: imagePage.pendingWorldY,
+                                                        qz: imagePage.pendingQz,
+                                                        qw: imagePage.pendingQw,
+                                                        displayX: dspX,
+                                                        displayY: dspY,
+                                                        angleDeg: imagePage.currentAngle
+                                                    });
+                                                    imagePage.hasPendingPoint = false;
+                                                }
+                                        }
+                                }
+
+                                // ========== 航点列表面板 ==========
+                                ColumnLayout {
+                                        visible: imagePage.activeMode === "points"
+                                        spacing: 6
+                                        Layout.fillWidth: true
+
+                                        Text {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            text: "航点列表"; color: "#00FFFF"; font.pixelSize: 14; font.bold: true
+                                        }
+                                        Rectangle { width: parent.width; height: 1; color: "#2a2a3a" }
+
+                                        // 删除按钮行
+                                        Row {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            spacing: 8
+                                            Button {
+                                                width: 36; height: 36
+                                                enabled: imagePage.selectedSavedIndex >= 0
+                                                background: Rectangle {
+                                                    radius: 6; color: parent.enabled ? (parent.hovered ? "#3a2020" : "#2a1a1a") : "#151720"
+                                                    border.color: parent.enabled ? "#FF4444" : "#333333"; border.width: 1
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                }
+                                                contentItem: Image {
+                                                    source: "qrc:/TrashCan.png"; width: 20; height: 20
+                                                    fillMode: Image.PreserveAspectFit; anchors.centerIn: parent
+                                                }
+                                                onClicked: {
+                                                    if (imagePage.selectedSavedIndex >= 0 && imagePage.selectedSavedIndex < imagePage.savedPoints.count) {
+                                                        imagePage.savedPoints.remove(imagePage.selectedSavedIndex)
+                                                        // 重新编号
+                                                        for (var i = 0; i < imagePage.savedPoints.count; i++) {
+                                                            imagePage.savedPoints.setProperty(i, "name", "点" + (i + 1))
+                                                        }
+                                                        imagePage.selectedSavedIndex = -1
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        ListView {
+                                            id: savedPointsList
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            clip: true
+                                            model: imagePage.savedPoints
+                                            delegate: Rectangle {
+                                                width: savedPointsList.width
+                                                height: 40
+                                                color: imagePage.selectedSavedIndex === index ? "#1A00FFFF" : "transparent"
+                                                radius: 3
+                                                Behavior on color { ColorAnimation { duration: 150 } }
+                                                Column {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.leftMargin: 8
+                                                    Text {
+                                                        text: name
+                                                        color: imagePage.selectedSavedIndex === index ? "#00FFFF" : "#E0E0E0"
+                                                        font.pixelSize: 12
+                                                        font.bold: imagePage.selectedSavedIndex === index
+                                                    }
+                                                    Text {
+                                                        text: "坐标: " + worldX.toFixed(2) + ", " + worldY.toFixed(2) + ", " + qz.toFixed(3) + ", " + qw.toFixed(3)
+                                                        color: imagePage.selectedSavedIndex === index ? "#FFAA00" : "#888888"
+                                                        font.pixelSize: 10
+                                                    }
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    onClicked: {
+                                                        imagePage.selectedSavedIndex = index
+                                                    }
+                                                }
+                                            }
+                                        }
+                                }
+
+                                // ========== 录制航点面板 ==========
+                                ColumnLayout {
+                                        visible: imagePage.activeMode === "math"
+                                        spacing: 6
+                                        Layout.fillWidth: true
+                                        
+                                        Text {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            text: "录制航点"; color: "#00FFFF"; font.pixelSize: 14; font.bold: true
+                                        }
+                                        Rectangle { width: parent.width; height: 1; color: "#2a2a3a" }
+                                        
+                                        // X 输入框
+                                        Row {
+                                                spacing: 5
+                                                Text { text: "X:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                                                TextField {
+                                                    id: inputX; text: "0"; width: 130
+                                                    validator: DoubleValidator { bottom: -3.8; top: 13.6 }
+                                                    background: Rectangle { border.color: inputX.acceptableInput ? "white" : "red"; border.width: 2 }
+                                                    onTextChanged: { imagePage.checkAndUpdateMarker(); }
+                                                }
+                                        }
+                                        
+                                        // Y 输入框
+                                        Row {
+                                                spacing: 5
+                                                Text { text: "Y:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                                                TextField {
+                                                    id: inputY; text: "0"; width: 130
+                                                    validator: DoubleValidator { bottom: -5.55; top: 7.35 }
+                                                    background: Rectangle { border.color: inputY.acceptableInput ? "white" : "red"; border.width: 2 }
+                                                    onTextChanged: { imagePage.checkAndUpdateMarker(); }
+                                                }
+                                        }
+                                        
+                                        // qz 输入框
+                                        Row {
+                                                spacing: 5
+                                                Text { text: "qz:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                                                TextField {
+                                                    id: inputQz; text: "0"; width: 130
+                                                    validator: DoubleValidator { bottom: -1; top: 1 }
+                                                    background: Rectangle { border.color: inputQz.acceptableInput ? "white" : "red"; border.width: 2 }
+                                                    onTextChanged: {
+                                                        if (imagePage.updatingQz) return;
+                                                        var qzVal = parseFloat(inputQz.text);
+                                                        if (isNaN(qzVal)) return;
+                                                        if (qzVal > 1) qzVal = 1;
+                                                        if (qzVal < -1) qzVal = -1;
+                                                        var qwVal = Math.sqrt(1 - qzVal * qzVal);
+                                                        imagePage.updatingQw = true;
+                                                        inputQw.text = qwVal.toFixed(4);
+                                                        imagePage.updatingQw = false;
+                                                        imagePage.checkAndUpdateMarker();
+                                                    }
+                                                }
+                                        }
+                                        
+                                        // qw 输入框
+                                        Row {
+                                                spacing: 5
+                                                Text { text: "qw:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                                                TextField {
+                                                    id: inputQw; text: "1"; width: 130
+                                                    validator: DoubleValidator { bottom: -1; top: 1 }
+                                                    background: Rectangle { border.color: inputQw.acceptableInput ? "white" : "red"; border.width: 2 }
+                                                    onTextChanged: {
+                                                        if (imagePage.updatingQw) return;
+                                                        var qwVal = parseFloat(inputQw.text);
+                                                        if (isNaN(qwVal)) return;
+                                                        if (qwVal > 1) qwVal = 1;
+                                                        if (qwVal < -1) qwVal = -1;
+                                                        var qzVal = Math.sqrt(1 - qwVal * qwVal);
+                                                        imagePage.updatingQz = true;
+                                                        inputQz.text = qzVal.toFixed(4);
+                                                        imagePage.updatingQz = false;
+                                                        imagePage.checkAndUpdateMarker();
+                                                    }
+                                                }
+                                        }
+                                        
+                                        // 发送按钮
+                                        Button {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: "发送"
+                                                width: 160
+                                                background: Rectangle {
+                                                    radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"
+                                                    border.color: "#00FFFF"; border.width: 1
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                }
+                                                contentItem: Text {
+                                                    text: parent.text; color: "#E0E0E0"; font.pixelSize: 12
+                                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                                }
+                                                onClicked: {
+                                                    if (!root.checkServoReady()) return;
+                                                    if (!inputX.acceptableInput || !inputY.acceptableInput ||
+                                                        !inputQz.acceptableInput || !inputQw.acceptableInput) { return; }
+                                                    var worldX = parseFloat(inputX.text);
+                                                    var worldY = parseFloat(inputY.text);
+                                                    var qz = parseFloat(inputQz.text);
+                                                    var qw = parseFloat(inputQw.text);
+                                                    var messageLocation = worldX.toFixed(3) + "," +
+                                                                        worldY.toFixed(3) + "," +
+                                                                        qz.toFixed(4) + "," + qw.toFixed(4);
+                                                    tcpManager.sendMessage("1007:" + messageLocation);
+                                                    // 持久化到地图和列表（与手绘航点-保存并上传逻辑完全对齐）
+                                                    imagePage.savedPoints.append({
+                                                        name: "点" + (imagePage.savedPoints.count + 1),
+                                                        worldX: worldX,
+                                                        worldY: worldY,
+                                                        qz: qz,
+                                                        qw: qw,
+                                                        displayX: marker.x + marker.width / 2,
+                                                        displayY: marker.y + marker.height / 2,
+                                                        angleDeg: imagePage.currentAngle
+                                                    });
+                                                    // 持久化后标记点保持可见（已在 updateMarker 中设置 marker.visible = true）
+                                                }
+                                        }
+                                }
+                                } // 关闭 inner ColumnLayout
+                        } // 关闭 leftControl Rectangle
+
+                       // 地图图片（参照 page5，Image 直接在布局内）
+                       Image {
+                           id: imageItem
+                           anchors.fill: parent
+                           fillMode: Image.PreserveAspectFit
+                           z: 0
+                           MouseArea {
+                                  anchors.fill: parent
+                                  property bool isValidTarget: true
+                                  property point startPos: Qt.point(0, 0)  // 存储起始点击位置
+                                  property point currentPos: Qt.point(0, 0) // 存储当前鼠标位置
+                                  onPressed:function(mouse){
+                                  isValidTarget = true;
+                                  if(!root.checkServoReady()) return;
+                                  var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;//容器宽度减去图片显示宽度，等于左右留白
+                                  var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
+
+                                  if (mouse.x < paintedX || mouse.x > paintedX + imageItem.paintedWidth ||
+                                  mouse.y < paintedY || mouse.y > paintedY + imageItem.paintedHeight) {
+                                  marker.visible = false;
+                                  arrow.visible = false;
+                                  imagePage.hasPendingPoint = false;
+                                  return;
+                                  }
+                                  //图片边界检测，paintedX左边界，paintedX+Width右边界，paintedY上边界，paintedY+width下边界
+                                  imagePage.currentAngle=0;
+                                  //记录目标点坐标，起始点和当前坐标
+                                  startPos=Qt.point(mouse.x,mouse.y);
+                                  currentPos=Qt.point(mouse.x,mouse.y);
+                                  targetPos = Qt.point(mouse.x, mouse.y);
+                                  //4.显示绿点
+                                  marker.x = mouse.x-marker.width/2;
+                                  marker.y = mouse.y-marker.height/2;
+                                  marker.visible = true;
+                                  //5.显示箭头，定位到起始点
+                                  arrow.x = startPos.x
+                                  arrow.y = startPos.y - arrow.height / 2;
+                                  arrow.visible = true;
+                                  arrow.rotation = 0;  // 初始角度归零
+
+                                  var grabX = mouse.x - paintedX;
+                                  //在图片上的具体横坐标
+                                  var grabY = mouse.y - paintedY;
+                                  //在图片上的具体纵坐标
+                                  var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
+                                  var x = Math.floor(grabX/scaleFactor);
+                                  var y = Math.floor(grabY/scaleFactor);
+                                  if (!mapProcessor.isOccupied(x, y)) {
+                                          console.log("是白色区域，允许点击！");
+                                      } else {
+                                         marker.visible=false;
+                                         arrow.visible = false;
+                                         isValidTarget = false;
+                                         imagePage.hasPendingPoint = false;
+                                         return;
+                                      }
+
+                                      // 计算并存储世界坐标（复用 onReleased 中的公式）
+                                      var lpX = startPos.x - paintedX;
+                                      var lpY = startPos.y - paintedY;
+                                      var opX = lpX / scaleFactor;
+                                      var opY = lpY / scaleFactor;
+                                      imagePage.pendingWorldX = mapOriginX + (opX * mapResolution);
+                                      imagePage.pendingWorldY = mapOriginY + ((imageItem.sourceSize.height - opY) * mapResolution);
+                                      imagePage.pendingQz = 0;
+                                      imagePage.pendingQw = 1;
+                                      imagePage.hasPendingPoint = true;
+
+                                  }
+                                  onPositionChanged:function(mouse){
+                                  if(!arrow.visible)return;
+                                  //更新当前位置
+                                  currentPos=Qt.point(mouse.x,mouse.y);
+                                  // 计算鼠标相对于箭头中心的偏移
+                                  var dx = currentPos.x - startPos.x;
+                                  var dy = currentPos.y - startPos.y;
+                                  if (dx === 0 && dy === 0) return;
+                                  // atan2 算角度
+                                  var rad = Math.atan2(dy, dx);
+                                  var deg = rad * (180 / Math.PI);
+                                  imagePage.currentAngle=deg;
+                                  arrow.rotation=deg;
+                                  // 实时更新四元数
+                                  imagePage.pendingQz = Math.sin(rad / 2.0);
+                                  imagePage.pendingQw = Math.cos(rad / 2.0);
+                                  }
+                                  onReleased:function(mouse){
+                                  if (!arrow.visible) return;
+                                  targetPos=currentPos;
+                                  var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;
+                                  var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
+                                  var localPixelX = startPos.x - paintedX;
+                                  var localPixelY = startPos.y - paintedY;
+                                   var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
+                                  var originPixelX = localPixelX / scaleFactor;
+                                  var originPixelY = localPixelY / scaleFactor;
+                                      var worldX = mapOriginX + (originPixelX * mapResolution);
+                                      var worldY = mapOriginY + ((imageItem.sourceSize.height - originPixelY) * mapResolution);
+                                      var thetaRad = imagePage.currentAngle * Math.PI / 180.0;
+                                      var qz = Math.sin(thetaRad / 2.0);
+                                      var qw = Math.cos(thetaRad / 2.0);
+                                  // 存入待上传坐标，上传逻辑已移至"保存并上传"按钮
+                                  imagePage.pendingWorldX = worldX;
+                                  imagePage.pendingWorldY = worldY;
+                                  imagePage.pendingQz = qz;
+                                  imagePage.pendingQw = qw;
+                                  imagePage.hasPendingPoint = true;
+                                  if (!isValidTarget) {
+                                          imagePage.hasPendingPoint = false;
+                                          return;
+                                      }
+                                  }
                                    }
-                                   background: Rectangle {
-                                       border.color: inputX.acceptableInput ? "white" : "red"
-                                       border.width: 2
-                                   }
-                                   onTextChanged: {
-                                       imagePage.checkAndUpdateMarker();
-                                   }
+                           asynchronous: true  // 异步加载，避免大图卡顿
+                       }
+
+                       // marker 和 arrow（浮在地图上方，z 高于 Image）
+                       Rectangle {
+                           id: marker
+                           width: 10; height: 10
+                           radius: 5
+                           color: "black"
+                           visible: false
+                           z: 10
+                       }
+                       Image{
+                           id:arrow
+                           width: 40
+                           height: 40
+                           source:"qrc:/arrow.png"
+                           visible: false
+                           z: 20
+                           transformOrigin: Item.Left
+                           rotation: imagePage.currentAngle
+                       }
+
+                       // 已保存航点的持久化标记（Repeater，浮在地图上方）
+                       Repeater {
+                           model: imagePage.savedPoints
+                           delegate: Item {
+                               z: 8
+                               // 标记点
+                               Rectangle {
+                                   x: displayX - 5; y: displayY - 5
+                                   width: 10; height: 10; radius: 5
+                                   color: imagePage.selectedSavedIndex === index ? "#FF4444" : "#00FFFF"
+                                   visible: true
+                                   z: 5
                                }
-                           }
-
-                           // Y 输入框
-                           Row {
-                               spacing: 5
-                               Text { text: "Y:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                               TextField {
-                                   id: inputY; text: "0"; width: 130
-                                   validator: DoubleValidator {
-                                       bottom: -5.55
-                                       top: 7.35
-                                   }
-                                   background: Rectangle {
-                                       border.color: inputY.acceptableInput ? "white" : "red"
-                                       border.width: 2
-                                   }
-                                   onTextChanged: {
-                                       imagePage.checkAndUpdateMarker();
-                                   }
+                               // 选中高亮外圈
+                               Rectangle {
+                                   x: displayX - 8; y: displayY - 8
+                                   width: 16; height: 16; radius: 8
+                                   color: "transparent"
+                                   border.color: "#FF4444"
+                                   border.width: 2
+                                   visible: imagePage.selectedSavedIndex === index
+                                   z: 6
                                }
-                           }
-
-                           // qz 输入框
-                           Row {
-                               spacing: 5
-                               Text { text: "qz:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                               TextField {
-                                   id: inputQz; text: "0"; width: 130
-                                   validator: DoubleValidator {
-                                       bottom: -1
-                                       top: 1
-                                   }
-                                   background: Rectangle {
-                                       border.color: inputQz.acceptableInput ? "white" : "red"
-                                       border.width: 2
-                                   }
-                                   onTextChanged: {
-                                       if (imagePage.updatingQz) return;
-                                       var qzVal = parseFloat(inputQz.text);
-                                       if (isNaN(qzVal)) return;
-                                       if (qzVal > 1) qzVal = 1;
-                                       if (qzVal < -1) qzVal = -1;
-                                       var qwVal = Math.sqrt(1 - qzVal * qzVal);
-                                       imagePage.updatingQw = true;
-                                       inputQw.text = qwVal.toFixed(4);
-                                       imagePage.updatingQw = false;
-                                       imagePage.checkAndUpdateMarker();
-                                   }
-                               }
-                           }
-
-                           // qw 输入框
-                           Row {
-                               spacing: 5
-                               Text { text: "qw:"; width: 30; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                               TextField {
-                                   id: inputQw; text: "1"; width: 130
-                                   validator: DoubleValidator {
-                                       bottom: -1
-                                       top: 1
-                                   }
-                                   background: Rectangle {
-                                       border.color: inputQw.acceptableInput ? "white" : "red"
-                                       border.width: 2
-                                   }
-                                   onTextChanged: {
-                                       if (imagePage.updatingQw) return;
-                                       var qwVal = parseFloat(inputQw.text);
-                                       if (isNaN(qwVal)) return;
-                                       if (qwVal > 1) qwVal = 1;
-                                       if (qwVal < -1) qwVal = -1;
-                                       var qzVal = Math.sqrt(1 - qwVal * qwVal);
-                                       imagePage.updatingQz = true;
-                                       inputQz.text = qzVal.toFixed(4);
-                                       imagePage.updatingQz = false;
-                                       imagePage.checkAndUpdateMarker();
-                                   }
-                               }
-                           }
-
-                           // 发送按钮
-                           Button {
-                               text: "发送"
-                               width: 160
-                               onClicked: {
-                                   if (!root.checkServoReady()) return;
-                                   if (!inputX.acceptableInput || !inputY.acceptableInput ||
-                                       !inputQz.acceptableInput || !inputQw.acceptableInput) {
-                                       return;
-                                   }
-
-                                   var worldX = parseFloat(inputX.text);
-                                   var worldY = parseFloat(inputY.text);
-                                   var qz = parseFloat(inputQz.text);
-                                   var qw = parseFloat(inputQw.text);
-
-                                   var messageLocation = worldX.toFixed(3) + "," +
-                                                       worldY.toFixed(3) + "," +
-                                                       qz.toFixed(4) + "," +
-                                                       qw.toFixed(4);
-                                   tcpManager.sendMessage("1007:" + messageLocation);
-                               }
-                           }
-
-                           // 选择图片按钮
-                           Button {
-                               text: "选择图片"
-                               width: 160
-                               onClicked: {
-                                   openFileDialog.open()
-                               }
-                           }
-
-                           // SSH下载图片按钮
-                           Button {
-                               text: "SSH下载图片"
-                               width: 160
-                               onClicked: {
-                                   sshManager.startDownload()
+                               // 方向箭头
+                               Image {
+                                   x: displayX; y: displayY - 20
+                                   width: 40; height: 40
+                                   source: "qrc:/arrow.png"
+                                   visible: true
+                                   z: 4
+                                   transformOrigin: Item.Left
+                                   rotation: angleDeg
                                }
                            }
                        }
-
-                       // 右边：地图容器
-                       Rectangle {
-                           id: mapContainer
-                           color: "#E0E0E0"
-                           Layout.fillHeight: true
-                           Layout.fillWidth: true
-                           Image {
-                               id: imageItem
-                               anchors.fill: parent // 填满容器
-                               fillMode: Image.PreserveAspectFit
-                               MouseArea {
-                                      anchors.fill: parent
-                                      property bool isValidTarget: true
-                                      property point startPos: Qt.point(0, 0)  // 存储起始点击位置
-                                      property point currentPos: Qt.point(0, 0) // 存储当前鼠标位置
-                                      onPressed:function(mouse){
-                                      isValidTarget = true;
-                                      if(!root.checkServoReady()) return;
-                                      var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;//容器宽度减去图片显示宽度，等于左右留白
-                                      var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
-
-                                      if (mouse.x < paintedX || mouse.x > paintedX + imageItem.paintedWidth ||
-                                      mouse.y < paintedY || mouse.y > paintedY + imageItem.paintedHeight) {
-                                      marker.visible = false;
-                                      arrow.visible = false;
-                                      return;
-                                      }
-                                      //图片边界检测，paintedX左边界，paintedX+Width右边界，paintedY上边界，paintedY+width下边界
-                                      imagePage.currentAngle=0;
-                                      //记录目标点坐标，起始点和当前坐标
-                                      startPos=Qt.point(mouse.x,mouse.y);
-                                      currentPos=Qt.point(mouse.x,mouse.y);
-                                      targetPos = Qt.point(mouse.x, mouse.y);
-                                      //4.显示绿点
-                                      marker.x = mouse.x-marker.width/2;
-                                      marker.y = mouse.y-marker.height/2;
-                                      marker.visible = true;
-                                      //5.显示箭头，定位到起始点
-                                      arrow.x = startPos.x
-                                      arrow.y = startPos.y - arrow.height / 2;
-                                      arrow.visible = true;
-                                      arrow.rotation = 0;  // 初始角度归零
-
-                                      var grabX = mouse.x - paintedX;
-                                      //在图片上的具体横坐标
-                                      var grabY = mouse.y - paintedY;
-                                      //在图片上的具体纵坐标
-                                      var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
-                                      var x = Math.floor(grabX/scaleFactor);
-                                      var y = Math.floor(grabY/scaleFactor);
-                                      if (!mapProcessor.isOccupied(x, y)) {
-                                              console.log("是白色区域，允许点击！");
-                                          } else {
-                                             marker.visible=false;
-                                             arrow.visible = false;
-                                             isValidTarget = false;
-                                             return;
-                                          }
-
-                                      }
-                                      onPositionChanged:function(mouse){
-                                      if(!arrow.visible)return;
-                                      //更新当前位置
-                                      currentPos=Qt.point(mouse.x,mouse.y);
-                                      // 计算鼠标相对于箭头中心的偏移
-                                      var dx = currentPos.x - startPos.x;
-                                      var dy = currentPos.y - startPos.y;
-                                      if (dx === 0 && dy === 0) return;
-                                      // atan2 算角度
-                                      var rad = Math.atan2(dy, dx);
-                                      var deg = rad * (180 / Math.PI);
-                                      imagePage.currentAngle=deg;
-                                      arrow.rotation=deg;
-                                      }
-                                      onReleased:function(mouse){
-                                      if (!arrow.visible) return;
-                                      targetPos=currentPos;
-                                      var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;
-                                      var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
-                                      var localPixelX = startPos.x - paintedX;
-                                      var localPixelY = startPos.y - paintedY;
-                                       var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
-                                      var originPixelX = localPixelX / scaleFactor;
-                                      var originPixelY = localPixelY / scaleFactor;
-                                          var worldX = mapOriginX + (originPixelX * mapResolution);
-                                          var worldY = mapOriginY + ((imageItem.sourceSize.height - originPixelY) * mapResolution);
-                                          var thetaRad = imagePage.currentAngle * Math.PI / 180.0;
-                                          var qz = Math.sin(thetaRad / 2.0);
-                                          var qw = Math.cos(thetaRad / 2.0);
-                                      var messageLocation = worldX.toFixed(3) + "," +
-                                      worldY.toFixed(3) + "," + qz.toFixed(4) + "," + qw.toFixed(4);
-                                      if(!root.checkServoReady())return;
-                                      if (!isValidTarget) {
-                                              return; // 直接退出，不发送任何数据
-                                          }
-                                      tcpManager.sendMessage("1007:"+messageLocation);
-                                      }
-                                       }
-                               asynchronous: true  // 异步加载，避免大图卡顿
-                           }
-
-                           // marker 和 arrow 在 mapContainer 内部
-                           Rectangle {
-                               id: marker
-                               width: 10; height: 10
-                               radius: 5
-                               color: "black"
-                               visible: false
-                               z:10
-                           }
-                           Image{
-                               id:arrow
-                               width: 40
-                               height: 40
-                               source:"qrc:/arrow.png"
-                               visible:false
-                               z:20
-                               transformOrigin: Item.Left
-                               rotation: imagePage.currentAngle
-                           }
-                       } // 关闭 mapContainer
-                   } // 关闭外层 RowLayout
+                   } // 关闭外层 Item
 
                    // 文件选择对话框
                    FileDialog {
@@ -1405,7 +1686,7 @@ ApplicationWindow {
                                             font.pixelSize: 11
                                             verticalAlignment: Text.AlignVCenter
                                             height: parent.height
-                                            width: parent.width - parent.children[0].width - 8
+                                            Layout.fillWidth: true - parent.children[0].width - 8
                                             elide: Text.ElideRight
                                         }
                                     }
@@ -1601,7 +1882,6 @@ ApplicationWindow {
                         }
                     }
                 }
-
                 // ---- 底部信息栏 ----
                 Rectangle {
                     id: infoBar
@@ -1672,8 +1952,7 @@ ApplicationWindow {
             }
         }
     }
-    }
-
+}
     // ---- Page Indicator ----
     Row {
         id: pageIndicator
@@ -1831,7 +2110,7 @@ ApplicationWindow {
                     anchors.centerIn: parent
                     Image {
                         id: icon3
-                        source: "qrc:/History.png"
+                        source: "qrc:/History_1.png"
                         width: 24; height: 24
                         fillMode: Image.PreserveAspectFit
                         anchors.horizontalCenter: parent.horizontalCenter
