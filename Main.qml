@@ -1,4 +1,4 @@
-﻿import QtQuick 2.15
+import QtQuick 2.15
 //Qt基础组件
 import QtQuick.Controls 2.15
 //Qt按钮，文本框
@@ -10,8 +10,8 @@ ApplicationWindow {
     id:root
     visible: true
     //显示窗口
-    width: 500
-    height: 900
+    width: 800
+    height: 1200
     title: "TCP 测试客户端"
     color: "#1a1b26"
 
@@ -160,7 +160,7 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         clip: true
-        interactive: true
+        interactive: false
 
         currentIndex: currentPageIndex
     Rectangle //主页面
@@ -847,27 +847,27 @@ ApplicationWindow {
                        var worldY = parseFloat(inputY.text);
                        var qz = parseFloat(inputQz.text);
                        var qw = parseFloat(inputQw.text);
-                       
+
                        // 世界坐标转像素坐标
                        var pixelX = (worldX - mapOriginX) / mapResolution;
                        var pixelY = (imageItem.sourceSize.height - (worldY - mapOriginY) / mapResolution);
-                       
+
                        // 像素坐标转显示坐标
                        var scaleFactor = imageItem.paintedWidth / imageItem.sourceSize.width;
                        var paintedX = (imageItem.width - imageItem.paintedWidth) / 2;
                        var paintedY = (imageItem.height - imageItem.paintedHeight) / 2;
-                       
+
                        var displayX = paintedX + pixelX * scaleFactor;
                        var displayY = paintedY + pixelY * scaleFactor;
-                       
+
                        // 四元数转角度
                        var angleRad = 2 * Math.atan2(qz, qw);
                        var angleDeg = angleRad * 180 / Math.PI;
-                       
+
                        marker.x = displayX - marker.width / 2;
                        marker.y = displayY - marker.height / 2;
                        marker.visible = true;
-                       
+
                        imagePage.currentAngle = angleDeg;
                        arrow.x = displayX;
                        arrow.y = displayY - arrow.height / 2;
@@ -1184,99 +1184,461 @@ ApplicationWindow {
         property string loadedImagePath: ""
         property var currentPoints: []
         property int wallCount: 0
+        property string activeList: ""  // "" = 隐藏, "markers" = 标记点列表, "walls" = 墙体列表
+        property int currentMarkerIndex: -1       // 当前选中的标记点索引
+        property int currentWallIndex: -1         // 当前选中的墙体索引
 
-        // ---- Top toolbar ----
-        Row {
-            id: wallToolbar
-            anchors.top: parent.top
-            anchors.topMargin: 10
-            anchors.horizontalCenter: parent.horizontalCenter
+        // ---- 中文数字转换 ----
+        function toChineseNum(n) {
+            var nums = ["一","二","三","四","五","六","七","八","九","十",
+                        "十一","十二","十三","十四","十五","十六","十七","十八","十九","二十"]
+            return n < nums.length ? nums[n] : String(n + 1)
+        }
+
+        // ---- 刷新列表 ----
+        function refreshMarkerList() {
+            markerListModel.clear()
+            var count = mapProvider.getCurrentPointCount()
+            var srcH = imageItem_1.sourceSize.height
+            for (var i = 0; i < count; i++) {
+                // 获取 C++ 中存储的源图像素坐标
+                var px = mapProvider.getCurrentWallPointX(i)
+                var py = mapProvider.getCurrentWallPointY(i)
+                // 复用 imagePage 坐标计算逻辑（第1117-1125行）：
+                // originPixelX/Y 即 mouseToPixel 的输出 → 直接套用 world 公式
+                var worldX = mapOriginX + (px * mapResolution)
+                var worldY = mapOriginY + ((srcH - py) * mapResolution)
+                var coordStr = "(" + worldX.toFixed(3) + ", " + worldY.toFixed(3) + ")"
+                markerListModel.append({ name: "标记点" + (i + 1), coord: coordStr })
+            }
+        }
+        function refreshWallList() {
+            wallListModel.clear()
+            var count = mapProvider.getWallCount()
+            for (var i = 0; i < count; i++) {
+                wallListModel.append({ name: "墙体" + toChineseNum(i) })
+            }
+        }
+
+        // ---- 列表模型 ----
+        ListModel { id: markerListModel }
+        ListModel { id: wallListModel }
+
+        // ---- 主布局 ----
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 8
             spacing: 8
-            Button {
-                text: "加载图片"
-                onClicked: page5FileDialog.open()
-            }
-            Button {
-                text: "完成墙体"
-                enabled: page5.currentPoints.length >= 2
-                onClicked: {
-                    mapProvider.finishCurrentWall()
-                    page5.currentPoints = []
-                    page5.wallCount = page5.wallCount + 1
-                    page5.refreshImage()
+
+            // ========== 左侧导航侧边栏 ==========
+            Rectangle {
+                id: sidebar
+                Layout.preferredWidth: page5.activeList === "" ? 48 : 210
+                Layout.fillHeight: true
+                color: "#1a1e2e"
+                radius: 10
+                border.color: "#2a2a3a"
+                border.width: 1
+
+                Behavior on Layout.preferredWidth {
+                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                }
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    spacing: 6
+
+                    // 标记点按钮 (navigator.png)
+                    Button {
+                        id: markerBtn
+                        width: 40; height: 40
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        background: Rectangle {
+                            radius: 8
+                            color: page5.activeList === "markers" ? "#1A00FFFF" : "transparent"
+                            Behavior on color { ColorAnimation { duration: 200 } }
+                        }
+                        contentItem: Image {
+                            source: "qrc:/navigator.png"
+                            width: 24; height: 24
+                            fillMode: Image.PreserveAspectFit
+                            anchors.centerIn: parent
+                        }
+                        onClicked: {
+                            if (page5.activeList === "markers") {
+                                page5.activeList = ""
+                            } else {
+                                page5.activeList = "markers"
+                                page5.refreshMarkerList()
+                            }
+                        }
+                    }
+
+                    // 墙体按钮 (wall.png)
+                    Button {
+                        id: wallBtn
+                        width: 40; height: 40
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        background: Rectangle {
+                            radius: 8
+                            color: page5.activeList === "walls" ? "#1A00FFFF" : "transparent"
+                            Behavior on color { ColorAnimation { duration: 200 } }
+                        }
+                        contentItem: Image {
+                            source: "qrc:/wall.png"
+                            width: 24; height: 24
+                            fillMode: Image.PreserveAspectFit
+                            anchors.centerIn: parent
+                        }
+                        onClicked: {
+                            if (page5.activeList === "walls") {
+                                page5.activeList = ""
+                            } else {
+                                page5.activeList = "walls"
+                                page5.refreshWallList()
+                            }
+                        }
+                    }
+
+                    // 删除按钮 (TrashCan.png)
+                    Button {
+                        id: deleteBtn
+                        width: 40; height: 40
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        background: Rectangle {
+                            radius: 8
+                            color: "transparent"
+                            Behavior on color { ColorAnimation { duration: 200 } }
+                        }
+                        contentItem: Image {
+                            source: "qrc:/TrashCan.png"
+                            width: 24; height: 24
+                            fillMode: Image.PreserveAspectFit
+                            anchors.centerIn: parent
+                        }
+                        onClicked: {
+                            if (page5.activeList === "markers") {
+                                if (page5.currentMarkerIndex >= 0) {
+                                    mapProvider.deleteCurrentWallPoint(page5.currentMarkerIndex)
+                                    // 同步移除 QML 中的跟踪数据
+                                    if (page5.currentMarkerIndex < page5.currentPoints.length) {
+                                        var arr = page5.currentPoints
+                                        arr.splice(page5.currentMarkerIndex, 1)
+                                        page5.currentPoints = arr
+                                    }
+                                    page5.currentMarkerIndex = -1
+                                    page5.refreshImage()
+                                }
+                            } else if (page5.activeList === "walls") {
+                                if (page5.currentWallIndex >= 0) {
+                                    mapProvider.deleteWall(page5.currentWallIndex)
+                                    page5.wallCount = mapProvider.getWallCount()
+                                    page5.currentWallIndex = -1
+                                    page5.refreshImage()
+                                }
+                            }
+                        }
+                    }
+
+                    // 列表面板
+                    Rectangle {
+                        id: listPanel
+                        visible: page5.activeList !== ""
+                        width: parent.width - 8
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        height: parent.height - 100
+                        color: "transparent"
+
+                        Column {
+                            anchors.fill: parent
+                            spacing: 6
+                            anchors.topMargin: 8
+
+                            // 列表标题
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: page5.activeList === "markers" ? "标记点列表" : "墙体列表"
+                                color: "#00FFFF"
+                                font.pixelSize: 14
+                                font.bold: true
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 1
+                                color: "#2a2a3a"
+                            }
+
+                            // 标记点列表
+                            ListView {
+                                id: markerListView
+                                visible: page5.activeList === "markers"
+                                width: parent.width
+                                height: parent.height - 30
+                                clip: true
+                                model: markerListModel
+                                delegate: Rectangle {
+                                    width: markerListView.width
+                                    height: 44
+                                    color: page5.currentMarkerIndex === index ? "#1A00FFFF" : "transparent"
+                                    radius: 3
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Row {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 6
+                                        spacing: 4
+                                        Text {
+                                            text: name
+                                            color: page5.currentMarkerIndex === index ? "#00FFFF" : "#E0E0E0"
+                                            font.pixelSize: 12
+                                            font.bold: page5.currentMarkerIndex === index
+                                            verticalAlignment: Text.AlignVCenter
+                                            height: parent.height
+                                            width: Math.min(implicitWidth + 6, parent.width * 0.38)
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            text: coord
+                                            color: page5.currentMarkerIndex === index ? "#FFAA00" : "#888888"
+                                            font.pixelSize: 11
+                                            verticalAlignment: Text.AlignVCenter
+                                            height: parent.height
+                                            width: parent.width - parent.children[0].width - 8
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            page5.currentMarkerIndex = index
+                                            mapProvider.selectCurrentWallPoint(index)
+                                            page5.refreshImage()
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 墙体列表
+                            ListView {
+                                id: wallListView
+                                visible: page5.activeList === "walls"
+                                width: parent.width
+                                height: parent.height - 30
+                                clip: true
+                                model: wallListModel
+                                delegate: Rectangle {
+                                    width: wallListView.width
+                                    height: 30
+                                    color: page5.currentWallIndex === index ? "#1A00FFFF" : "transparent"
+                                    radius: 3
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Text {
+                                        text: name
+                                        color: page5.currentWallIndex === index ? "#00FFFF" : "#E0E0E0"
+                                        font.pixelSize: 12
+                                        font.bold: page5.currentWallIndex === index
+                                        leftPadding: 12
+                                        verticalAlignment: Text.AlignVCenter
+                                        anchors.fill: parent
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            page5.currentWallIndex = index
+                                            mapProvider.selectWall(index)
+                                            page5.refreshImage()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            Button {
-                text: "撤销"
-                enabled: page5.currentPoints.length > 0
-                onClicked: {
-                    mapProvider.clearCurrentWall()
-                    page5.currentPoints = []
-                    page5.refreshImage()
+
+            // ========== 右侧内容区域 ==========
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 8
+
+                // ---- 顶部工具栏 ----
+                Row {
+                    id: wallToolbar
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 8
+                    Button {
+                        text: "加载图片"
+                        background: Rectangle {
+                            radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"
+                            border.color: "#00FFFF"; border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        contentItem: Text {
+                            text: parent.text; color: "#E0E0E0"; font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: page5FileDialog.open()
+                    }
+                    Button {
+                        text: "完成墙体"
+                        enabled: page5.currentPoints.length >= 2
+                        background: Rectangle {
+                            radius: 6; color: parent.enabled ? (parent.hovered ? "#2a2a3a" : "#1a1e2e") : "#151720"
+                            border.color: parent.enabled ? "#00FFFF" : "#333333"; border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        contentItem: Text {
+                            text: parent.text; color: parent.enabled ? "#E0E0E0" : "#555555"; font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: {
+                            mapProvider.finishCurrentWall()
+                            page5.currentPoints = []
+                            page5.wallCount = page5.wallCount + 1
+                            page5.refreshImage()
+                            page5.refreshMarkerList()
+                            page5.refreshWallList()
+                        }
+                    }
+                    Button {
+                        text: "撤销"
+                        enabled: page5.currentPoints.length > 0
+                        background: Rectangle {
+                            radius: 6; color: parent.enabled ? (parent.hovered ? "#2a2a3a" : "#1a1e2e") : "#151720"
+                            border.color: parent.enabled ? "#00FFFF" : "#333333"; border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        contentItem: Text {
+                            text: parent.text; color: parent.enabled ? "#E0E0E0" : "#555555"; font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: {
+                            mapProvider.clearCurrentWall()
+                            page5.currentPoints = []
+                            page5.refreshImage()
+                            page5.refreshMarkerList()
+                        }
+                    }
+                    Button {
+                        text: "清空全部"
+                        background: Rectangle {
+                            radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"
+                            border.color: "#00FFFF"; border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        contentItem: Text {
+                            text: parent.text; color: "#E0E0E0"; font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: {
+                            mapProvider.clearAllWalls()
+                            page5.currentPoints = []
+                            page5.wallCount = 0
+                            page5.refreshImage()
+                            page5.refreshMarkerList()
+                            page5.refreshWallList()
+                        }
+                    }
+                    Button {
+                        text: "保存地图"
+                        background: Rectangle {
+                            radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"
+                            border.color: "#00FFFF"; border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        contentItem: Text {
+                            text: parent.text; color: "#E0E0E0"; font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: page5SaveDialog.open()
+                    }
                 }
-            }
-            Button {
-                text: "清空全部"
-                onClicked: {
-                    mapProvider.clearAllWalls()
-                    page5.currentPoints = []
-                    page5.wallCount = 0
-                    page5.refreshImage()
+
+                // ---- 地图图片区域 ----
+                Image {
+                    id: imageItem_1
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    fillMode: Image.PreserveAspectFit
+
+                    function mouseToPixel(mouseX, mouseY) {
+                        var offsetX = (imageItem_1.width - imageItem_1.paintedWidth) / 2
+                        var offsetY = (imageItem_1.height - imageItem_1.paintedHeight) / 2
+                        var scale = imageItem_1.sourceSize.width / imageItem_1.paintedWidth
+                        if (scale <= 0) scale = 1
+                        return { x: (mouseX - offsetX) * scale, y: (mouseY - offsetY) * scale }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: imageItem_1.source !== ""
+                        onClicked: function(mouse) {
+                            // 边界检测：判断点击是否在图片有效范围内
+                            var paintedX = (imageItem_1.width - imageItem_1.paintedWidth) / 2
+                            var paintedY = (imageItem_1.height - imageItem_1.paintedHeight) / 2
+                            if (mouse.x < paintedX || mouse.x > paintedX + imageItem_1.paintedWidth ||
+                                mouse.y < paintedY || mouse.y > paintedY + imageItem_1.paintedHeight) {
+                                console.log("点击位置在地图区域外，已忽略")
+                                return
+                            }
+
+                            var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
+
+                            // 边界检测：判断坐标是否在源图片有效范围内
+                            if (pos.x < 0 || pos.x > imageItem_1.sourceSize.width ||
+                                pos.y < 0 || pos.y > imageItem_1.sourceSize.height) {
+                                console.log("坐标超出地图有效范围，已忽略")
+                                return
+                            }
+
+                            mapProvider.addWallPoint(pos.x, pos.y)
+                            page5.currentPoints = page5.currentPoints.concat([{x: pos.x, y: pos.y}])
+                            page5.refreshImage()
+                            page5.refreshMarkerList()
+                        }
+                    }
+                }
+
+                // ---- 底部信息栏 ----
+                Rectangle {
+                    id: infoBar
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    color: "#1a1e2e"
+                    radius: 6
+                    Text {
+                        anchors.centerIn: parent
+                        text: "当前墙点数: " + page5.currentPoints.length + "  |  已完成墙体: " + page5.wallCount
+                        color: "#E0E0E0"
+                        font.pixelSize: 13
+                    }
                 }
             }
         }
 
-        // ---- Image area ----
-        Image {
-            id: imageItem_1
-            anchors.top: wallToolbar.bottom
-            anchors.bottom: infoBar.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: 10
-            fillMode: Image.PreserveAspectFit
-
-            function mouseToPixel(mouseX, mouseY) {
-                var offsetX = (imageItem_1.width - imageItem_1.paintedWidth) / 2
-                var offsetY = (imageItem_1.height - imageItem_1.paintedHeight) / 2
-                var scale = imageItem_1.sourceSize.width / imageItem_1.paintedWidth
-                if (scale <= 0) scale = 1
-                return { x: (mouseX - offsetX) * scale, y: (mouseY - offsetY) * scale }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                enabled: imageItem_1.source !== ""
-                onClicked: function(mouse) {
-                    var pos = imageItem_1.mouseToPixel(mouse.x, mouse.y)
-                    mapProvider.addWallPoint(pos.x, pos.y)
-                    page5.currentPoints = page5.currentPoints.concat([{x: pos.x, y: pos.y}])
-                    page5.refreshImage()
-                }
-            }
-        }
-
-        // ---- Info bar ----
-        Rectangle {
-            id: infoBar
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 36
-            color: "#1a1e2e"
-            Text {
-                anchors.centerIn: parent
-                text: "当前墙点数: " + page5.currentPoints.length + "  |  已完成墙体: " + page5.wallCount
-                color: "#E0E0E0"
-                font.pixelSize: 13
-            }
-        }
-
+        // ---- 图片刷新 ----
         function refreshImage() {
             imageItem_1.source = ""
             imageItem_1.source = "image://mapProvider?" + Math.random()
         }
 
+        // ---- C++ 信号连接：实时同步数据到侧边栏列表 ----
+        Connections {
+            target: mapProvider
+            function onWallsChanged() {
+                page5.refreshMarkerList()
+                page5.refreshWallList()
+            }
+            function onImageChanged() {
+                page5.refreshMarkerList()
+                page5.refreshWallList()
+            }
+        }
+
+        // ---- 文件选择对话框 ----
         FileDialog {
             id: page5FileDialog
             title: "选择图片"
@@ -1289,6 +1651,24 @@ ApplicationWindow {
                 page5.loadedImagePath = filePath
                 mapProvider.loadFromPng(filePath)
                 page5.refreshImage()
+                page5.refreshMarkerList()
+                page5.refreshWallList()
+            }
+        }
+
+        // ---- 保存地图对话框 ----
+        FileDialog {
+            id: page5SaveDialog
+            title: "保存地图"
+            fileMode: FileDialog.SaveFile
+            nameFilters: ["PNG 图片 (*.png)"]
+            defaultSuffix: "png"
+            onAccepted: {
+                var filePath = page5SaveDialog.selectedFile.toString()
+                if (filePath.startsWith("file:///")) {
+                    filePath = filePath.substring(8)
+                }
+                mapProvider.saveMapWithWalls(filePath)
             }
         }
     }

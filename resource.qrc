@@ -5,7 +5,14 @@
         <file>Robotics_1.png</file>
         <file>Joystick_1.png</file>
         <file>setting_1.png</file>
-        <file>History.png</file>
+        <file>History_1.png</file>
         <file>map_1.png</file>
+            <file>navigator.png</file>
+        <file>wall.png</file>
+            <file>TrashCan.png</file>
+            <file>Mapchoose.png</file>
+        <file>server.png</file>
+        <file>Handing.png</file>
+        <file>Math.png</file>
     </qresource>
 </RCC>

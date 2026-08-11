@@ -60,6 +60,17 @@ bool MapImageProvider::saveAsPng(const QString &path)
     }
     return result;
 }
+bool MapImageProvider::saveMapWithWalls(const QString &path)
+{
+    if (m_image.isNull()) return false;
+    // 复制原图并在其上绘制虚拟墙，然后保存
+    QImage result = m_image.copy();
+    drawWallsOnImage(result);
+    if (result.save(path, "PNG")) {
+        return true;
+    }
+    return false;
+}
 void MapImageProvider::addWallPoint(qreal x, qreal y)
 {
     m_currentWallPoints.append(QPointF(x, y));
@@ -71,6 +82,7 @@ void MapImageProvider::finishCurrentWall()
     if (m_currentWallPoints.size() >= 2) {
         m_virtualWalls.append(m_currentWallPoints);
         m_currentWallPoints.clear();
+        m_selectedPointIndex = -1;
         emit imageChanged();
         emit wallsChanged();
     }
@@ -79,6 +91,7 @@ void MapImageProvider::clearCurrentWall()
 {
     if (!m_currentWallPoints.isEmpty()) {
         m_currentWallPoints.clear();
+        m_selectedPointIndex = -1;
         emit imageChanged();
         emit wallsChanged();
     }
@@ -99,6 +112,20 @@ void MapImageProvider::deselectWall()
         emit wallsChanged();
     }
 }
+void MapImageProvider::selectCurrentWallPoint(int index)
+{
+    if (index >= 0 && index < m_currentWallPoints.size()) {
+        m_selectedPointIndex = index;
+        emit imageChanged();
+    }
+}
+void MapImageProvider::deselectCurrentWallPoint()
+{
+    if (m_selectedPointIndex != -1) {
+        m_selectedPointIndex = -1;
+        emit imageChanged();
+    }
+}
 void MapImageProvider::deleteWall(int index)
 {
     if (index >= 0 && index < m_virtualWalls.size()) {
@@ -109,11 +136,22 @@ void MapImageProvider::deleteWall(int index)
         emit wallsChanged();
     }
 }
+void MapImageProvider::deleteCurrentWallPoint(int index)
+{
+    if (index >= 0 && index < m_currentWallPoints.size()) {
+        m_currentWallPoints.removeAt(index);
+        if (m_selectedPointIndex == index) m_selectedPointIndex = -1;
+        else if (m_selectedPointIndex > index) m_selectedPointIndex--;
+        emit imageChanged();
+        emit wallsChanged();
+    }
+}
 void MapImageProvider::clearAllWalls()
 {
     m_currentWallPoints.clear();
     m_virtualWalls.clear();
     m_selectedWallIndex = -1;
+    m_selectedPointIndex = -1;
     emit imageChanged();
     emit wallsChanged();
 }
@@ -133,7 +171,7 @@ void MapImageProvider::drawWallsOnImage(QImage &img)
         const QList<QPointF> &wall = m_virtualWalls[i];
         if (wall.size() < 2) continue;
         bool sel = (i == m_selectedWallIndex);
-        painter.setPen(QPen(sel ? QColor("#00FFFF") : Qt::black, sel ? 4 : 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(sel ? QColor("#FF4444") : Qt::black, sel ? 4 : 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         for (int j = 0; j < wall.size() - 1; j++) painter.drawLine(wall[j], wall[j + 1]);
     }
     if (m_currentWallPoints.size() >= 2) {
@@ -141,9 +179,22 @@ void MapImageProvider::drawWallsOnImage(QImage &img)
         for (int i = 0; i < m_currentWallPoints.size() - 1; i++) painter.drawLine(m_currentWallPoints[i], m_currentWallPoints[i + 1]);
     }
     if (!m_currentWallPoints.isEmpty()) {
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor("#00FFFF"));
-        for (const QPointF &pt : m_currentWallPoints) painter.drawEllipse(pt, 3, 3);
+        for (int i = 0; i < m_currentWallPoints.size(); i++) {
+            bool sel = (i == m_selectedPointIndex);
+            if (sel) {
+                // 选中点：红色实心圆 + 外圈光环
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(QColor("#FF4444"));
+                painter.drawEllipse(m_currentWallPoints[i], 5, 5);
+                painter.setPen(QPen(QColor("#FF4444"), 2));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawEllipse(m_currentWallPoints[i], 8, 8);
+            } else {
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(QColor("#00FFFF"));
+                painter.drawEllipse(m_currentWallPoints[i], 3, 3);
+            }
+        }
     }
     painter.end();
 }
