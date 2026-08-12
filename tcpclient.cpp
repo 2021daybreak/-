@@ -30,37 +30,30 @@ TcpClient::TcpClient(QObject *parent)
             if (str.isEmpty()) return;
 
             // --- 协议解析逻辑 ---
-            if (str.startsWith("1001:")) {
-                // 机械臂数据：截取 "1001:" 之后的内容
-                QString armStr = str.mid(5);
-                QStringList parts = armStr.split(",");
-
-                QVariantList values;
-                for (const QString &part : parts) {
-                    bool ok = false;
-                    int val = part.toInt(&ok);
-                    if (ok) values.append(val);
-                }
-
-                // 发送专门的机械臂信号给 QML
-                emit armDataReceived(values);
+            // 提取前缀和数据
+            int colonIdx = str.indexOf(':');
+            if (colonIdx <= 0) { emit errorMessage("未知格式数据"); return; }
+            QString prefix = str.left(colonIdx);
+            QString dataStr = str.mid(colonIdx + 1);
+            QStringList parts = dataStr.split(",");
+            QVariantList values;
+            for (const QString &part : parts) {
+                bool ok = false;
+                double val = part.toDouble(&ok);
+                if (ok) values.append(val);
             }
-            else if (str.startsWith("1002:")) {
-                // 机械手数据：截取 "1002:" 之后的内容
-                QString handStr = str.mid(5);
-                QStringList parts = handStr.split(",");
+            if (values.isEmpty()) return;
 
-                QVariantList values;
-                for (const QString &part : parts) {
-                    bool ok = false;
-                    int val = part.toInt(&ok);
-                    if (ok) values.append(val);
-                }
-
-                // 发送专门的机械手信号给 QML
-                emit handDataReceived(values);
-            }else{
-                emit errorMessage("未知格式数据");}
+            if (prefix == "1111") emit headDataReceived(values);
+            else if (prefix == "2222") emit bodyDataReceived(values);
+            else if (prefix == "3333") emit leftArmDataReceived(values);
+            else if (prefix == "4444") emit rightArmDataReceived(values);
+            else if (prefix == "5555") emit leftHandDataReceived(values);
+            else if (prefix == "6666") emit rightHandDataReceived(values);
+            else if (prefix == "1001" || prefix == "1002") {
+                // 兼容旧版协议
+            }
+            else { emit errorMessage("未知格式数据"); }
 });
         // 当连接成功时
         connect(socket, &QTcpSocket::connected, this, [this]() {

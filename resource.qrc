@@ -14,5 +14,10 @@
         <file>server.png</file>
         <file>Handing.png</file>
         <file>Math.png</file>
+        <file>Body.png</file>
+        <file>Arm.png</file>
+        <file>Hand.png</file>
+        <file>plus.png</file>
+        <file>minus.png</file>
     </qresource>
 </RCC>

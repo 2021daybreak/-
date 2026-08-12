@@ -27,10 +27,23 @@ ApplicationWindow {
                 ctx.beginPath(); ctx.ellipse(cx-r,cy-r*0.4,r*2,r*0.8); ctx.stroke(); }
         }
     }
-    property var inputvalues:["0","0","0","0","0","0","0","0","0","0","0"]
-    property var feedbackValues:["0","0","0","0","0","0","0","0","0","0","0"]
-    property var inputvalues_hands:["0","0","0","0","0","0"]
-    property var feedbackValues_hands:["0","0","0","0","0","0"]
+    // 各关节当前值（由各面板 TextField onTextChanged 实时同步）
+    property var headValues: ["0", "0"]                     // Head 1-2
+    property var bodyValues: ["0", "0", "0", "0"]           // Body 1-4
+    property var leftArmValues: ["0","0","0","0","0","0","0"]  // LA 1-7
+    property var rightArmValues: ["0","0","0","0","0","0","0"] // RA 1-7
+    property var leftHandValues: ["0","0","0","0","0","0"]     // LH 1-6
+    property var rightHandValues: ["0","0","0","0","0","0"]    // RH 1-6
+
+    // 各关节反馈值（由 TCP 接收处理函数写入，fb_xxx Text 绑定读取）
+    property var headFeedback: ["0", "0"]
+    property var bodyFeedback: ["0", "0", "0", "0"]
+    property var leftArmFeedback: ["0","0","0","0","0","0","0"]
+    property var rightArmFeedback: ["0","0","0","0","0","0","0"]
+    property var leftHandFeedback: ["0","0","0","0","0","0"]
+    property var rightHandFeedback: ["0","0","0","0","0","0"]
+
+    property int controlVelocity: 1   // 步进倍率，被所有 +/- 按钮引用
     property bool isServoReady: false
     property bool isServoReady_1:false
     property bool isServerConnected: false
@@ -42,6 +55,18 @@ ApplicationWindow {
     property point targetPos: Qt.point(0, 0)
     property real pixelX: 0
     property real pixelY: 0
+
+    // 全局发送全部关节数据（从根级别数组读取，不跨 Component 作用域）
+    function sendAllJoints() {
+        if(!checkServoReady()) return
+        tcpManager.sendMessage("1111:" + headValues.join(","))
+        tcpManager.sendMessage("2222:" + bodyValues.join(","))
+        tcpManager.sendMessage("3333:" + leftArmValues.join(","))
+        tcpManager.sendMessage("4444:" + rightArmValues.join(","))
+        tcpManager.sendMessage("5555:" + leftHandValues.join(","))
+        tcpManager.sendMessage("6666:" + rightHandValues.join(","))
+    }
+
     Rectangle//引航栏
         {
             id: topNavBar
@@ -168,435 +193,536 @@ ApplicationWindow {
         id: mainPage
         color: "#1a1b26"
     Column {
-        //垂直布局容器
-        anchors.centerIn: parent
-        //于父容器居中放置
-        spacing: 10
-        width: parent.width * 0.9
-        //父容器的70%
+        anchors.fill: parent
+    RowLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 10
 
-        Row{
-                width:parent.width - 40
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing:10
-        Grid {
-                   columns: 3
-                   spacing: 10
-                   width: parent.width*0.5 - 5
-
-                   // Axis 1
-                   Text { text: "axis 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_0; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_0.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
+            // ========== 左侧区域 70%（所有原有内容） ==========
+            ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 70
+                    spacing: 6
+                    // ========== Tab 导航栏 ==========
+                    RowLayout {
+                        spacing: 0
+                        Layout.fillWidth: true
+                        
+                        property int currentTab: 0
+                        
+                        // Tab 1: 头部与躯干
+                        Item {
+                            Layout.preferredWidth: 44
+                            Layout.fillWidth: false
+                            Layout.preferredHeight: 40
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "transparent"
+                                border.color: parent.parent.currentTab === 0 ? "#00FFFF" : "#2a2a3a"
+                                border.width: parent.parent.currentTab === 0 ? 2 : 1
+                                radius: 4
+                                Behavior on border.color { ColorAnimation { duration: 200 } }
+                                Image { source: "qrc:/Body.png"; width: 24; height: 24; fillMode: Image.PreserveAspectFit; anchors.centerIn: parent }
+                            }
+                            MouseArea { anchors.fill: parent; onClicked: { parent.parent.currentTab = 0; mainPanelLoader.sourceComponent = headBodyPanel } }
                         }
-                   }
-                   Text { id: feedback_0; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   // Axis 2
-                   Text { text: "axis 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_1; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_1.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
+                        // Tab 2: 左臂与右臂
+                        Item {
+                            Layout.preferredWidth: 44
+                            Layout.fillWidth: false
+                            Layout.preferredHeight: 40
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "transparent"
+                                border.color: parent.parent.currentTab === 1 ? "#00FFFF" : "#2a2a3a"
+                                border.width: parent.parent.currentTab === 1 ? 2 : 1
+                                radius: 4
+                                Behavior on border.color { ColorAnimation { duration: 200 } }
+                                Image { source: "qrc:/Arm.png"; width: 24; height: 24; fillMode: Image.PreserveAspectFit; anchors.centerIn: parent }
+                            }
+                            MouseArea { anchors.fill: parent; onClicked: { parent.parent.currentTab = 1; mainPanelLoader.sourceComponent = armPanel } }
                         }
-                   }
-                   Text { id: feedback_1; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   // Axis 3
-                   Text { text: "axis 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_2; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_2.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
+                        // Tab 3: 左手与右手
+                        Item {
+                            Layout.preferredWidth: 44
+                            Layout.fillWidth: false
+                            Layout.preferredHeight: 40
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "transparent"
+                                border.color: parent.parent.currentTab === 2 ? "#00FFFF" : "#2a2a3a"
+                                border.width: parent.parent.currentTab === 2 ? 2 : 1
+                                radius: 4
+                                Behavior on border.color { ColorAnimation { duration: 200 } }
+                                Image { source: "qrc:/Hand.png"; width: 24; height: 24; fillMode: Image.PreserveAspectFit; anchors.centerIn: parent }
+                            }
+                            MouseArea { anchors.fill: parent; onClicked: { parent.parent.currentTab = 2; mainPanelLoader.sourceComponent = handPanel } }
                         }
-                   }
-                   Text { id: feedback_2; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   // Axis 4
-                   Text { text: "axis 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_3; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_3.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                        }
-                   }
-                   Text { id: feedback_3; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   // Axis 5
-                   Text { text: "axis 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_4; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_4.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                        }
-                   }
-                   Text { id: feedback_4; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   // Axis 6
-                   Text { text: "axis 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_5; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_5.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                        }
-                   }
-                   Text { id: feedback_5; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   // Axis 7
-                   Text { text: "axis 7:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_6; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_6.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                        }
-                   }
-                   Text { id: feedback_6; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   //axis 8
-                   Text { text: "axis 8:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_7; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_7.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                   }
-                   }
-                   Text { id: feedback_7; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   //axis 9
-                   Text { text: "axis 9:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_8; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_8.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                        }
-                   }
-                   Text { id: feedback_8; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   //axis 10
-                   Text { text: "axis 10:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_9; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                       }
-                       background:Rectangle{
-                       border.color: input_9.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                   }
-                   }
-                   Text { id: feedback_9; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                   //axis 11
-                   Text { text: "axis 11:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                   TextField {
-                       id: input_10; text: "0"; width: 80;
-                       validator: DoubleValidator {
-                               bottom: -360
-                               top: 360
-                           }
-                       background:Rectangle{
-                       border.color: input_10.acceptableInput ? "#333" : "#FF4444"
-                       border.width: 2
-                        }
-                   }
-                   Text { id: feedback_10; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-               }
-        Grid {
-                columns: 3
-                width: parent.width * 0.5 - 5
-                spacing: 10
-                // Finger 1
-                Text { text: "Finger 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                TextField {
-                    id: inputH_0; text: "0"; width: 80;
-                    validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                    background:Rectangle{
-                    border.color: inputH_0.acceptableInput ? "#333" : "#FF4444"
-                    border.width: 2
-                     }
-                }
-                Text { id: feedbackH_0; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                // Finger 2
-                Text { text: "Finger 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                TextField {
-                    id: inputH_1; text: "0"; width: 80;
-                    validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                    background:Rectangle{
-                    border.color: inputH_1.acceptableInput ? "#333" : "#FF4444"
-                    border.width: 2
-                     }
-                }
-                Text { id: feedbackH_1; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                // Finger 3
-                Text { text: "Finger 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                TextField {
-                    id: inputH_2; text: "0"; width: 80;
-                    validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                    background:Rectangle{
-                    border.color: inputH_2.acceptableInput ? "#333" : "#FF4444"
-                    border.width: 2
-                     }
-                }
-                Text { id: feedbackH_2; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                // Finger 4
-                Text { text: "Finger 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                TextField {
-                    id: inputH_3; text: "0"; width: 80;
-                    validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                   background:Rectangle{
-                   border.color: inputH_3.acceptableInput ? "#333" : "#FF4444"
-                   border.width: 2
+                        // 弹性空间填满剩余区域
+                        Item { Layout.fillWidth: true }
                     }
-                }
-                Text { id: feedbackH_3; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                // Finger 5
-                Text { text: "Finger 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                TextField {
-                    id: inputH_4; text: "0"; width: 80;
-                    validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                   background:Rectangle{
-                   border.color: inputH_4.acceptableInput ? "#333" : "#FF4444"
-                   border.width: 2
+                    
+                    // ========== 面板内容区（Loader 动态切换） ==========
+                    Loader {
+                        id: mainPanelLoader
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        sourceComponent: headBodyPanel
                     }
-                }
-                Text { id: feedbackH_4; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-
-                // Finger 6
-                Text { text: "Finger 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
-                TextField {
-                    id: inputH_5; text: "0"; width: 80;
-                    validator: IntValidator {
-                            bottom: 0
-                            top: 100
-                        }
-                   background:Rectangle{
-                   border.color: inputH_5.acceptableInput ? "#333" : "#FF4444"
-                   border.width: 2
+                    
+                    // ========== 错误提示 ==========
+                    Text {
+                        id: rangeError
+                        text: ""
+                        font.pixelSize: 14
+                        color: "red"
+                        visible: false
+                        Layout.alignment: Qt.AlignHCenter
                     }
-                }
-                Text { id: feedbackH_5; text: "0"; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
-        }
-}
-        Text{
-                 id:rangeError
-                 text: ""
-                 font.pixelSize:14
-                 color:"red"
-                 anchors.horizontalCenter: parent.horizontalCenter
-                 y:110
-                 visible: false
-                 z:100
-        }
-        Timer{
-                 id:validationCheck
-                 interval:100
-                 running: true
-                 repeat: true
-        onTriggered: {
-                   //把每个输入存入一个数组变量
-                   var allInputs = [   input_0, input_1, input_2, input_3, input_4, input_5,
-                                       input_6, input_7, input_8, input_9, input_10,
-                                       inputH_0, inputH_1, inputH_2, inputH_3, inputH_4, inputH_5]
-                   //引入新变量用于判断错误
-                   var hasError = false;
-                   for (var i = 0; i < allInputs.length; i++) {
-                                       // 只要有一个输入框的状态不是 "Acceptable" (合法)，就标记为有错误
-                                      if (!allInputs[i].acceptableInput) {
-                                                      hasError = true;
-                                                      break;
-                                                  }
-                   }
-                   rangeError.visible = hasError;
-                   rangeError.text = hasError ? "输入有误，请检查数值范围和格式！" : "";
-        }
-}
-        Button {
-            text: "发送全部(机械臂部分)"
-                       width: parent.width
-                       height: 40
-                       onClicked: {
-                   if(!root.checkServoReady())return;
-                   if(!input_0.acceptableInput||
-                      !input_1.acceptableInput||
-                      !input_2.acceptableInput||
-                      !input_3.acceptableInput||
-                      !input_4.acceptableInput||
-                      !input_5.acceptableInput||
-                      !input_6.acceptableInput||
-                      !input_7.acceptableInput||
-                      !input_8.acceptableInput||
-                      !input_9.acceptableInput||
-                      !input_10.acceptableInput){
-                                      rangeError.text="输入数据超过范围"
-                                      return;
-                   }
-                           var msg = "1001:"
-                           msg += input_0.text + ","
-                           msg += input_1.text + ","
-                           msg += input_2.text + ","
-                           msg += input_3.text + ","
-                           msg += input_4.text + ","
-                           msg += input_5.text + ","
-                           msg += input_6.text + ","
-                           msg += input_7.text + ","
-                           msg += input_8.text + ","
-                           msg += input_9.text + ","
-                           msg += input_10.text
-                           tcpManager.sendMessage(msg)
-                       }
-                   }
-         Button{
-             text: "发送全部(机械手部分)"
-                      width: parent.width
-                      height: 40
-                      onClicked: {
-                   if(!root.checkServoReady())return;
-                   if(!inputH_0.acceptableInput||
-                   !inputH_1.acceptableInput||
-                   !inputH_2.acceptableInput||
-                   !inputH_3.acceptableInput||
-                   !inputH_4.acceptableInput||
-                   !inputH_5.acceptableInput){
-                   rangeError.text="输入数据超过范围"
-                   return;
-                   }
-                      var msg = "1002:"
-                      msg += inputH_0.text + ","
-                      msg += inputH_1.text + ","
-                      msg += inputH_2.text + ","
-                      msg += inputH_3.text + ","
-                      msg += inputH_4.text + ","
-                      msg += inputH_5.text
-                      tcpManager.sendMessage(msg)
-                      }
-         }
+                    
+                    // ========== 输入验证（在各组件发送按钮处检查，避免跨 Component 作用域访问） ==========
+                    
+                    // TCP 错误显示
+                    Text {
+                        id: errorText
+                        text: ""
+                        font.pixelSize: 14
+                        color: "red"
+                        visible: false
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+            }
 
-         Text {
-                   id: errorText
-                   text: ""
-                   font.pixelSize: 14
-                   color: "red"
-                   anchors.horizontalCenter: parent.horizontalCenter
-                   visible: false  // 默认隐藏
+
+            // 分隔线
+            Rectangle {
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 1
+                    color: "#00FFFF"
+                    opacity: 0.3
+            }
+            // ========== 右侧区域 30%：Control Velocity ==========
+            Rectangle {
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 180
+                    Layout.minimumWidth: 180
+                    radius: 10
+                    border.color: "#2a2a3a"
+                    border.width: 1
+                    color: "#161720"
+                    clip: true
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 10
+
+                        Text {
+                            text: "Control Velocity"
+                            color: "#00FFFF"
+                            font.pixelSize: 14
+                            font.bold: true
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#00FFFF"; opacity: 0.2 }
+
+                        RowLayout {
+                            spacing: 6
+                            Text { text: "Value:"; color: "#E0E0E0"; font.pixelSize: 12 }
+                            TextField {
+                                id: velocityInput
+                                text: "1"
+                                Layout.preferredWidth: 60
+                                validator: IntValidator { bottom: 1; top: 100 }
+                                color: "#E0E0E0"
+                                background: Rectangle { radius: 4; color: "#1a1e2e"; border.color: velocityInput.acceptableInput ? "#00FFFF" : "#FF4444"; border.width: 1 }
+                                onTextChanged: {
+                                    if (acceptableInput && text !== "") {
+                                        root.controlVelocity = parseInt(text)
+                                        velocitySlider.value = root.controlVelocity
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Drag to adjust step size"
+                            color: "#666666"
+                            font.pixelSize: 10
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        Slider {
+                            id: velocitySlider
+                            Layout.fillWidth: true
+                            from: 1; to: 100; stepSize: 1
+                            value: root.controlVelocity
+                            onMoved: {
+                                root.controlVelocity = Math.round(value)
+                                velocityInput.text = root.controlVelocity.toString()
+                            }
+                        }
+
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#00FFFF"; opacity: 0.2 }
+
+                        Text {
+                            text: "Step: ±" + root.controlVelocity
+                            color: "#00FFFF"
+                            font.pixelSize: 13
+                            font.bold: true
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        Text {
+                            text: "All +/- buttons now change\nby this value per click"
+                            color: "#555555"
+                            font.pixelSize: 10
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        Item { Layout.fillHeight: true }
+                    }
+            }
     }
+                // ========== 面板组件定义 ==========
+
+                Component {
+                    id: headBodyPanel
+                    ColumnLayout {
+                        spacing: 6
+                        Layout.fillWidth: true
+                        
+                        // --- 头部控制 ---
+                        Text { text: "头部控制 (Head)"; color: "#00FFFF"; font.pixelSize: 13; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+                        Grid {
+                            columns: 5; spacing: 8
+                            Layout.fillWidth: true
+                            Text { text: "Head 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: head1; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { headValues[0] = text } background: Rectangle { border.color: head1.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_head1; text: root.headFeedback[0]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(head1.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); head1.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(head1.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); head1.text = v.toString() } } }
+                            Text { text: "Head 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: head2; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { headValues[1] = text } background: Rectangle { border.color: head2.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_head2; text: root.headFeedback[1]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(head2.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); head2.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(head2.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); head2.text = v.toString() } } }
+                        }
+                        
+                        // --- 躯干控制 ---
+                        Text { text: "躯干控制 (Body)"; color: "#00FFFF"; font.pixelSize: 13; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+                        Grid {
+                            columns: 5; spacing: 8
+                            Layout.fillWidth: true
+                            Text { text: "Body 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: body1; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { bodyValues[0] = text } background: Rectangle { border.color: body1.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_body1; text: root.bodyFeedback[0]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body1.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); body1.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body1.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); body1.text = v.toString() } } }
+                            Text { text: "Body 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: body2; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { bodyValues[1] = text } background: Rectangle { border.color: body2.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_body2; text: root.bodyFeedback[1]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body2.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); body2.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body2.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); body2.text = v.toString() } } }
+                            Text { text: "Body 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: body3; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { bodyValues[2] = text } background: Rectangle { border.color: body3.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_body3; text: root.bodyFeedback[2]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body3.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); body3.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body3.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); body3.text = v.toString() } } }
+                            Text { text: "Body 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: body4; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { bodyValues[3] = text } background: Rectangle { border.color: body4.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_body4; text: root.bodyFeedback[3]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body4.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); body4.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(body4.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); body4.text = v.toString() } } }
+                        }
+                        
+                        // --- 按钮 ---
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 8
+                            Button {
+                                Layout.fillWidth: true; text: "发送头部控制"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { if(!root.checkServoReady())return; tcpManager.sendMessage("1111:"+head1.text+","+head2.text) }
+                            }
+                            Button {
+                                Layout.fillWidth: true; text: "发送躯干控制"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { if(!root.checkServoReady())return; tcpManager.sendMessage("2222:"+body1.text+","+body2.text+","+body3.text+","+body4.text) }
+                            }
+                            Button {
+                                Layout.fillWidth: true; text: "发送全部"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { root.sendAllJoints() }
+                            }
+                        }
+                    }
+                }
+                
+                Component {
+                    id: armPanel
+                    ColumnLayout {
+                        spacing: 6
+                        Layout.fillWidth: true
+                        
+                        // --- 左臂控制 ---
+                        Text { text: "左臂控制 (Left Arm)"; color: "#00FFFF"; font.pixelSize: 13; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+                        Grid {
+                            columns: 5; spacing: 8
+                            Layout.fillWidth: true
+                            Text { text: "LA 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la1; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[0] = text } background: Rectangle { border.color: la1.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la1; text: root.leftArmFeedback[0]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la1.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la1.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la1.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la1.text = v.toString() } } }
+                            Text { text: "LA 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la2; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[1] = text } background: Rectangle { border.color: la2.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la2; text: root.leftArmFeedback[1]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la2.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la2.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la2.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la2.text = v.toString() } } }
+                            Text { text: "LA 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la3; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[2] = text } background: Rectangle { border.color: la3.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la3; text: root.leftArmFeedback[2]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la3.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la3.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la3.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la3.text = v.toString() } } }
+                            Text { text: "LA 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la4; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[3] = text } background: Rectangle { border.color: la4.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la4; text: root.leftArmFeedback[3]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la4.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la4.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la4.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la4.text = v.toString() } } }
+                            Text { text: "LA 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la5; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[4] = text } background: Rectangle { border.color: la5.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la5; text: root.leftArmFeedback[4]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la5.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la5.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la5.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la5.text = v.toString() } } }
+                            Text { text: "LA 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la6; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[5] = text } background: Rectangle { border.color: la6.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la6; text: root.leftArmFeedback[5]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la6.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la6.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la6.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la6.text = v.toString() } } }
+                            Text { text: "LA 7:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: la7; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { leftArmValues[6] = text } background: Rectangle { border.color: la7.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_la7; text: root.leftArmFeedback[6]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la7.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); la7.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(la7.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); la7.text = v.toString() } } }
+                        }
+                        
+                        // --- 右臂控制 ---
+                        Text { text: "右臂控制 (Right Arm)"; color: "#00FFFF"; font.pixelSize: 13; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+                        Grid {
+                            columns: 5; spacing: 8
+                            Layout.fillWidth: true
+                            Text { text: "RA 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra1; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[0] = text } background: Rectangle { border.color: ra1.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra1; text: root.rightArmFeedback[0]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra1.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra1.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra1.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra1.text = v.toString() } } }
+                            Text { text: "RA 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra2; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[1] = text } background: Rectangle { border.color: ra2.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra2; text: root.rightArmFeedback[1]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra2.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra2.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra2.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra2.text = v.toString() } } }
+                            Text { text: "RA 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra3; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[2] = text } background: Rectangle { border.color: ra3.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra3; text: root.rightArmFeedback[2]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra3.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra3.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra3.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra3.text = v.toString() } } }
+                            Text { text: "RA 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra4; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[3] = text } background: Rectangle { border.color: ra4.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra4; text: root.rightArmFeedback[3]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra4.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra4.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra4.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra4.text = v.toString() } } }
+                            Text { text: "RA 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra5; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[4] = text } background: Rectangle { border.color: ra5.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra5; text: root.rightArmFeedback[4]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra5.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra5.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra5.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra5.text = v.toString() } } }
+                            Text { text: "RA 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra6; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[5] = text } background: Rectangle { border.color: ra6.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra6; text: root.rightArmFeedback[5]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra6.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra6.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra6.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra6.text = v.toString() } } }
+                            Text { text: "RA 7:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: ra7; text: "0"; width: 80; validator: DoubleValidator { bottom: -360; top: 360 } onTextChanged: { rightArmValues[6] = text } background: Rectangle { border.color: ra7.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_ra7; text: root.rightArmFeedback[6]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra7.text)||0; v = Math.min(360, Math.max(-360, v + root.controlVelocity)); ra7.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseFloat(ra7.text)||0; v = Math.min(360, Math.max(-360, v - root.controlVelocity)); ra7.text = v.toString() } } }
+                        }
+                        
+                        // --- 按钮 ---
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 8
+                            Button {
+                                Layout.fillWidth: true; text: "发送左臂控制"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { if(!root.checkServoReady())return; tcpManager.sendMessage("3333:"+la1.text+","+la2.text+","+la3.text+","+la4.text+","+la5.text+","+la6.text+","+la7.text) }
+                            }
+                            Button {
+                                Layout.fillWidth: true; text: "发送右臂控制"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { if(!root.checkServoReady())return; tcpManager.sendMessage("4444:"+ra1.text+","+ra2.text+","+ra3.text+","+ra4.text+","+ra5.text+","+ra6.text+","+ra7.text) }
+                            }
+                            Button {
+                                Layout.fillWidth: true; text: "发送全部"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { root.sendAllJoints() }
+                            }
+                        }
+                    }
+                }
+                
+                Component {
+                    id: handPanel
+                    ColumnLayout {
+                        spacing: 6
+                        Layout.fillWidth: true
+                        
+                        // --- 左手控制 ---
+                        Text { text: "左手控制 (Left Hand)"; color: "#00FFFF"; font.pixelSize: 13; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+                        Grid {
+                            columns: 5; spacing: 8
+                            Layout.fillWidth: true
+                            Text { text: "LH 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: lh1; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { leftHandValues[0] = text } background: Rectangle { border.color: lh1.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_lh1; text: root.leftHandFeedback[0]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh1.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); lh1.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh1.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); lh1.text = v.toString() } } }
+                            Text { text: "LH 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: lh2; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { leftHandValues[1] = text } background: Rectangle { border.color: lh2.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_lh2; text: root.leftHandFeedback[1]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh2.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); lh2.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh2.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); lh2.text = v.toString() } } }
+                            Text { text: "LH 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: lh3; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { leftHandValues[2] = text } background: Rectangle { border.color: lh3.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_lh3; text: root.leftHandFeedback[2]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh3.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); lh3.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh3.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); lh3.text = v.toString() } } }
+                            Text { text: "LH 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: lh4; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { leftHandValues[3] = text } background: Rectangle { border.color: lh4.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_lh4; text: root.leftHandFeedback[3]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh4.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); lh4.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh4.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); lh4.text = v.toString() } } }
+                            Text { text: "LH 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: lh5; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { leftHandValues[4] = text } background: Rectangle { border.color: lh5.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_lh5; text: root.leftHandFeedback[4]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh5.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); lh5.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh5.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); lh5.text = v.toString() } } }
+                            Text { text: "LH 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: lh6; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { leftHandValues[5] = text } background: Rectangle { border.color: lh6.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_lh6; text: root.leftHandFeedback[5]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh6.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); lh6.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(lh6.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); lh6.text = v.toString() } } }
+                        }
+                        
+                        // --- 右手控制 ---
+                        Text { text: "右手控制 (Right Hand)"; color: "#00FFFF"; font.pixelSize: 13; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+                        Grid {
+                            columns: 5; spacing: 8
+                            Layout.fillWidth: true
+                            Text { text: "RH 1:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: rh1; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { rightHandValues[0] = text } background: Rectangle { border.color: rh1.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_rh1; text: root.rightHandFeedback[0]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh1.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); rh1.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh1.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); rh1.text = v.toString() } } }
+                            Text { text: "RH 2:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: rh2; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { rightHandValues[1] = text } background: Rectangle { border.color: rh2.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_rh2; text: root.rightHandFeedback[1]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh2.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); rh2.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh2.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); rh2.text = v.toString() } } }
+                            Text { text: "RH 3:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: rh3; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { rightHandValues[2] = text } background: Rectangle { border.color: rh3.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_rh3; text: root.rightHandFeedback[2]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh3.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); rh3.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh3.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); rh3.text = v.toString() } } }
+                            Text { text: "RH 4:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: rh4; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { rightHandValues[3] = text } background: Rectangle { border.color: rh4.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_rh4; text: root.rightHandFeedback[3]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh4.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); rh4.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh4.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); rh4.text = v.toString() } } }
+                            Text { text: "RH 5:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: rh5; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { rightHandValues[4] = text } background: Rectangle { border.color: rh5.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_rh5; text: root.rightHandFeedback[4]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh5.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); rh5.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh5.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); rh5.text = v.toString() } } }
+                            Text { text: "RH 6:"; verticalAlignment: Text.AlignVCenter; color: "#E0E0E0" }
+                            TextField { id: rh6; text: "0"; width: 80; validator: IntValidator { bottom: 0; top: 100 } onTextChanged: { rightHandValues[5] = text } background: Rectangle { border.color: rh6.acceptableInput ? "#333" : "#FF4444"; border.width: 2 } }
+                            Text { id: fb_rh6; text: root.rightHandFeedback[5]; verticalAlignment: Text.AlignVCenter; color: "#00FFFF" }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/plus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh6.text)||0; v = Math.min(100, Math.max(0, v + root.controlVelocity)); rh6.text = v.toString() } } }
+                            Rectangle { width: 22; height: 22; radius: 4; color: "#1a1e2e"; border.color: "#00FFFF"; border.width: 1; opacity: 0.5; Image { anchors.centerIn: parent; source: "qrc:/minus.png"; width: 11; height: 11; fillMode: Image.PreserveAspectFit } MouseArea { anchors.fill: parent; onClicked: { var v = parseInt(rh6.text)||0; v = Math.min(100, Math.max(0, v - root.controlVelocity)); rh6.text = v.toString() } } }
+                        }
+                        
+                        // --- 按钮 ---
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 8
+                            Button {
+                                Layout.fillWidth: true; text: "发送左手控制"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { if(!root.checkServoReady())return; tcpManager.sendMessage("5555:"+lh1.text+","+lh2.text+","+lh3.text+","+lh4.text+","+lh5.text+","+lh6.text) }
+                            }
+                            Button {
+                                Layout.fillWidth: true; text: "发送右手控制"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { if(!root.checkServoReady())return; tcpManager.sendMessage("6666:"+rh1.text+","+rh2.text+","+rh3.text+","+rh4.text+","+rh5.text+","+rh6.text) }
+                            }
+                            Button {
+                                Layout.fillWidth: true; text: "发送全部"
+                                background: Rectangle { radius: 6; color: parent.hovered ? "#2a2a3a" : "#1a1e2e"; border.color: "#00FFFF"; border.width: 1 }
+                                contentItem: Text { text: parent.text; color: "#E0E0E0"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                onClicked: { root.sendAllJoints() }
+                            }
+                        }
+                    }
+                }
 }
     Connections {        target: tcpManager
-        function onArmDataReceived(values) {
-
-                   // 安全检查：防止传过来空数据
-                   if (!values) {
-                      return;
-                   }
-                   if (values.length !==11){
-                   errorText.text = "机械臂数据格式错误";
-                   errorText.visible = true;
-                   return;
-                   }
-                   errorText.visible = false;
-                   //隐藏错误界面
-                   if (values.length > 0) feedback_0.text = values[0];
-                   if (values.length > 1) feedback_1.text = values[1];
-                   if (values.length > 2) feedback_2.text = values[2];
-                   if (values.length > 3) feedback_3.text = values[3];
-                   if (values.length > 4) feedback_4.text = values[4];
-                   if (values.length > 5) feedback_5.text = values[5];
-                   if (values.length > 6) feedback_6.text = values[6];
-                   if (values.length > 7) feedback_7.text = values[7];
-                   if (values.length > 8) feedback_8.text = values[8];
-                   if (values.length > 9) feedback_9.text = values[9];
-                   if (values.length > 10) feedback_10.text = values[10];
-                   }
-        function onHandDataReceived(values){
-                   if (!values) {
-                   return;}
-
-                   if (values.length !== 6) {
-                   errorText.text = "机械手数据格式错误";
-                   errorText.visible = true;
-                   return;
-        }          if (values.length > 0)feedbackH_0.text = values[0];
-                   if (values.length > 1)feedbackH_1.text = values[1];
-                   if (values.length > 2)feedbackH_2.text = values[2];
-                   if (values.length > 3)feedbackH_3.text = values[3];
-                   if (values.length > 4)feedbackH_4.text = values[4];
-                   if (values.length > 5)feedbackH_5.text = values[5];
+        function onHeadDataReceived(values) {
+            if (!values || values.length !== 2) { errorText.text = "头部数据格式错误"; errorText.visible = true; return }
+            errorText.visible = false
+            headFeedback = [values[0], values[1]]
+        }
+        function onBodyDataReceived(values) {
+            if (!values || values.length !== 4) { errorText.text = "躯干数据格式错误"; errorText.visible = true; return }
+            errorText.visible = false
+            bodyFeedback = [values[0], values[1], values[2], values[3]]
+        }
+        function onLeftArmDataReceived(values) {
+            if (!values || values.length !== 7) { errorText.text = "左臂数据格式错误"; errorText.visible = true; return }
+            errorText.visible = false
+            leftArmFeedback = [values[0], values[1], values[2], values[3], values[4], values[5], values[6]]
+        }
+        function onRightArmDataReceived(values) {
+            if (!values || values.length !== 7) { errorText.text = "右臂数据格式错误"; errorText.visible = true; return }
+            errorText.visible = false
+            rightArmFeedback = [values[0], values[1], values[2], values[3], values[4], values[5], values[6]]
+        }
+        function onLeftHandDataReceived(values) {
+            if (!values || values.length !== 6) { errorText.text = "左手数据格式错误"; errorText.visible = true; return }
+            errorText.visible = false
+            leftHandFeedback = [values[0], values[1], values[2], values[3], values[4], values[5]]
+        }
+        function onRightHandDataReceived(values) {
+            if (!values || values.length !== 6) { errorText.text = "右手数据格式错误"; errorText.visible = true; return }
+            errorText.visible = false
+            rightHandFeedback = [values[0], values[1], values[2], values[3], values[4], values[5]]
         }
         function onErrorMessage(msg) {
-                    errorText.text = msg;
-                    errorText.visible = true;
-                }
-         function onConnectionStatusChanged(status){
-            statusText.text = status
-            errorText.visible = false
+            errorText.text = msg; errorText.visible = true
         }
-}
+        function onConnectionStatusChanged(status) {
+            statusText.text = status; errorText.visible = false
+        }
+    }
     }
     Rectangle {
         id: runPage
@@ -778,7 +904,7 @@ ApplicationWindow {
                   anchors.margins: 20
                   width: 280
                    height: 150
-                  spacing:10
+                  spacing: 20
                   z:10
                   Text{
                   text: "服务器设置"
